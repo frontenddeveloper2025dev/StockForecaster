@@ -142,7 +142,7 @@ if step == "Upload":
     st.header("1. Cargar Datos")
     
     # Data source selection
-    data_source = st.radio("Fuente de datos:", ["Archivo CSV", "Yahoo Finance API", "Alpha Vantage API", "Marketstack API", "Finage API"])
+    data_source = st.radio("Fuente de datos:", ["Archivo CSV", "Yahoo Finance API", "Alpha Vantage API", "Marketstack API", "Finage API", "Finnhub API"])
     
     if data_source == "Archivo CSV":
         st.subheader("📁 Subir archivo CSV")
@@ -613,6 +613,156 @@ if step == "Upload":
             except Exception as e:
                 st.error(f"Error descargando desde Finage: {e}")
                 st.info("Verifica que el símbolo sea correcto y que tengas acceso a Finage")
+    
+    elif data_source == "Finnhub API":
+        st.subheader("📊 Finnhub API")
+        
+        # Use the provided API key
+        api_key = "d2qlgp9r01qn21mk2h50d2qlgp9r01qn21mk2h5g"
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            symbol = st.text_input("Símbolo", value="AAPL", help="Ej: AAPL, GOOGL, MSFT, TSLA")
+        with col2:
+            resolution = st.selectbox("Resolución", ["D", "W", "M"], index=0, 
+                                    help="D=Diario, W=Semanal, M=Mensual")
+        
+        # Time period selection
+        period = st.selectbox("Período", ["1M", "3M", "6M", "1Y", "2Y", "5Y"], index=3)
+        
+        # Market categories for Finnhub
+        st.subheader("🎯 Mercados y símbolos")
+        finnhub_markets = {
+            "US Large Cap": ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NVDA", "BRK.B"],
+            "US Growth": ["TSLA", "NVDA", "AMD", "NFLX", "CRM", "ADBE", "PYPL"],
+            "US Value": ["JPM", "JNJ", "PG", "KO", "WMT", "V", "MA"],
+            "Tech Giants": ["AAPL", "MSFT", "GOOGL", "AMZN", "META", "NFLX", "NVDA"],
+            "Financial": ["JPM", "BAC", "WFC", "GS", "MS", "C", "USB"],
+            "Healthcare": ["JNJ", "UNH", "PFE", "ABBV", "TMO", "DHR", "BMY"]
+        }
+        
+        selected_category = st.selectbox("Categoría:", list(finnhub_markets.keys()))
+        selected_symbol = st.selectbox("O selecciona un símbolo:", [""] + finnhub_markets[selected_category])
+        
+        if selected_symbol:
+            symbol = selected_symbol
+        
+        if st.button("Descargar desde Finnhub"):
+            try:
+                with st.spinner(f"Descargando {symbol} desde Finnhub..."):
+                    # Calculate timestamps for Finnhub API (Unix timestamps)
+                    end_date = datetime.now()
+                    if period == "1M":
+                        start_date = end_date - timedelta(days=30)
+                    elif period == "3M":
+                        start_date = end_date - timedelta(days=90)
+                    elif period == "6M":
+                        start_date = end_date - timedelta(days=180)
+                    elif period == "1Y":
+                        start_date = end_date - timedelta(days=365)
+                    elif period == "2Y":
+                        start_date = end_date - timedelta(days=730)
+                    elif period == "5Y":
+                        start_date = end_date - timedelta(days=1825)
+                    
+                    # Convert to Unix timestamps
+                    start_timestamp = int(start_date.timestamp())
+                    end_timestamp = int(end_date.timestamp())
+                    
+                    # Finnhub stock candle API endpoint
+                    url = "https://finnhub.io/api/v1/stock/candle"
+                    params = {
+                        'symbol': symbol,
+                        'resolution': resolution,
+                        'from': start_timestamp,
+                        'to': end_timestamp,
+                        'token': api_key
+                    }
+                    
+                    # Make API request
+                    response = requests.get(url, params=params)
+                    
+                    if response.status_code == 200:
+                        json_data = response.json()
+                        
+                        # Check if data is available
+                        if json_data.get('s') == 'ok' and 'c' in json_data:
+                            # Convert to DataFrame
+                            df_data = []
+                            timestamps = json_data['t']
+                            opens = json_data['o']
+                            highs = json_data['h']
+                            lows = json_data['l']
+                            closes = json_data['c']
+                            volumes = json_data['v']
+                            
+                            for i in range(len(timestamps)):
+                                df_data.append({
+                                    'date': pd.to_datetime(timestamps[i], unit='s'),
+                                    'open': opens[i],
+                                    'high': highs[i],
+                                    'low': lows[i],
+                                    'close': closes[i],
+                                    'volume': volumes[i]
+                                })
+                            
+                            data = pd.DataFrame(df_data)
+                            data = data.set_index('date').sort_index()
+                            
+                            st.success(f"Datos de {symbol} descargados desde Finnhub")
+                            
+                            # Show API info
+                            st.info(f"📊 **{symbol}** - Finnhub Professional Market Data")
+                            st.info(f"📈 Resolución: {resolution} | Período: {period} | Registros: {len(data)}")
+                            
+                            # Show data preview
+                            st.dataframe(data.head())
+                            
+                            # Select target column
+                            available_cols = list(data.columns)
+                            default_col = "close" if "close" in available_cols else available_cols[0]
+                            target_col = st.selectbox("Columna a analizar:", available_cols, 
+                                                    index=available_cols.index(default_col))
+                            
+                            if st.button("Procesar datos Finnhub"):
+                                # Process the data
+                                st.session_state.data = data
+                                st.session_state.target_col = target_col
+                                st.session_state.symbol = symbol
+                                st.session_state.data_source = "Finnhub"
+                                st.success(f"Datos de {symbol} procesados desde Finnhub")
+                                
+                                # Show basic stats
+                                col1, col2, col3 = st.columns(3)
+                                with col1:
+                                    st.metric("Registros", len(data))
+                                with col2:
+                                    start_date = data.index.min().strftime("%Y-%m-%d")
+                                    st.metric("Desde", start_date)
+                                with col3:
+                                    end_date = data.index.max().strftime("%Y-%m-%d")
+                                    st.metric("Hasta", end_date)
+                        elif json_data.get('s') == 'no_data':
+                            st.error(f"No hay datos disponibles para {symbol} en el período seleccionado")
+                        else:
+                            st.error(f"Error en respuesta de Finnhub: {json_data}")
+                            
+                    else:
+                        st.error(f"Error API: {response.status_code}")
+                        if response.status_code == 401:
+                            st.error("Error de autenticación. Verifica la API key de Finnhub.")
+                        elif response.status_code == 429:
+                            st.error("Límite de consultas excedido. Espera un momento.")
+                        else:
+                            try:
+                                error_data = response.json()
+                                st.error(f"Error: {error_data}")
+                            except:
+                                st.error("Error desconocido de la API")
+                            
+            except Exception as e:
+                st.error(f"Error descargando desde Finnhub: {e}")
+                st.info("Verifica que el símbolo sea correcto y esté disponible en Finnhub")
 
 # Step 2: Visualize
 elif step == "Visualize":
