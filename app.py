@@ -40,12 +40,17 @@ try:
 except ImportError:
     SENTIMENT_AVAILABLE = False
 
-# Page config
-st.set_page_config(page_title="🚀 Advanced Financial AI", layout="wide", page_icon="📊")
+# Page config with custom favicon
+st.set_page_config(
+    page_title="ARIMA Financial AI Dashboard", 
+    layout="wide", 
+    page_icon="logo.png",
+    initial_sidebar_state="expanded"
+)
 
 # Initialize session state for advanced features
 if 'theme' not in st.session_state:
-    st.session_state.theme = 'default'
+    st.session_state.theme = 'arima_orange'
 if 'user_level' not in st.session_state:
     st.session_state.user_level = 1
 if 'achievements' not in st.session_state:
@@ -57,6 +62,15 @@ if 'mood_tracker' not in st.session_state:
 
 # Dashboard Theme Selection
 themes = {
+    'arima_orange': {
+        'primary': '#FF6B35',
+        'secondary': '#FF8C42', 
+        'background': '#FFFFFF',
+        'text': '#2C2C2C',
+        'accent': '#FFA726',
+        'gradient_start': '#FF6B35',
+        'gradient_end': '#FF8C42'
+    },
     'default': {
         'primary': '#1f77b4',
         'secondary': '#ff7f0e', 
@@ -92,10 +106,19 @@ themes = {
 # Sidebar theme selector
 with st.sidebar:
     st.subheader("🎨 Personalización")
+    theme_names = {
+        'arima_orange': '🔥 ARIMA Orange',
+        'default': '🎨 Clásico',
+        'dark': '🌙 Oscuro', 
+        'ocean': '🌊 Océano',
+        'sunset': '🌅 Atardecer',
+        'forest': '🌲 Bosque'
+    }
+    
     selected_theme = st.selectbox(
         "Tema del Dashboard:",
         options=list(themes.keys()),
-        format_func=lambda x: f"🎨 {x.title()}",
+        format_func=lambda x: theme_names.get(x, x.title()),
         index=list(themes.keys()).index(st.session_state.theme)
     )
     st.session_state.theme = selected_theme
@@ -113,15 +136,37 @@ with st.sidebar:
             color: {theme_colors['text']};
             border-left: 4px solid {theme_colors['primary']};
             padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }}
+        .css-1d391kg {{
+            background: linear-gradient(135deg, {theme_colors['primary']}, {theme_colors['secondary']});
+        }}
+        .sidebar .sidebar-content {{
+            background: linear-gradient(180deg, {theme_colors['background']}, #f8f9fa);
         }}
     </style>
     """, unsafe_allow_html=True)
 
-# Title with theme styling
+# Title with theme styling and logo integration
 st.markdown(f"""
-<div style="text-align: center; padding: 20px; background: linear-gradient(90deg, {theme_colors['primary']}, {theme_colors['secondary']}); border-radius: 10px; margin-bottom: 20px;">
-    <h1 style="color: white; margin: 0;">🚀 Advanced Financial AI Dashboard</h1>
-    <p style="color: white; margin: 5px 0;">Análisis Inteligente • Forecasting Avanzado • Insights en Tiempo Real</p>
+<div style="text-align: center; padding: 25px; background: linear-gradient(135deg, {theme_colors['primary']}, {theme_colors['secondary']}); border-radius: 15px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+    <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 10px;">
+        <div style="background: white; border-radius: 50%; padding: 8px; margin-right: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
+            <span style="font-size: 24px;">📊</span>
+        </div>
+        <h1 style="color: white; margin: 0; font-family: 'Arial Black', Arial, sans-serif; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">
+            ARIMA Financial AI Dashboard
+        </h1>
+    </div>
+    <p style="color: white; margin: 0; font-size: 16px; opacity: 0.95;">
+        🔮 Forecasting Avanzado • 📈 Análisis Inteligente • 🎯 Insights en Tiempo Real
+    </p>
+    <div style="margin-top: 15px;">
+        <span style="background: rgba(255,255,255,0.2); padding: 5px 15px; border-radius: 20px; color: white; font-size: 12px;">
+            Powered by ARIMA, Prophet & LSTM
+        </span>
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
