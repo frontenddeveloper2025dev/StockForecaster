@@ -1365,9 +1365,11 @@ dependencies = [
     { name = "numpy" },
     { name = "pandas" },
     { name = "plotly" },
+    { name = "requests" },
     { name = "scipy" },
     { name = "statsmodels" },
     { name = "streamlit" },
+    { name = "websockets" },
     { name = "yfinance" },
 ]
 
@@ -1378,9 +1380,11 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.3.2" },
     { name = "pandas", specifier = ">=2.3.2" },
     { name = "plotly", specifier = ">=6.3.0" },
+    { name = "requests", specifier = ">=2.32.5" },
     { name = "scipy", specifier = ">=1.16.1" },
     { name = "statsmodels", specifier = ">=0.14.5" },
     { name = "streamlit", specifier = ">=1.49.1" },
+    { name = "websockets", specifier = ">=15.0.1" },
     { name = "yfinance", specifier = ">=0.2.65" },
 ]
 

@@ -142,7 +142,7 @@ if step == "Upload":
     st.header("1. Cargar Datos")
     
     # Data source selection
-    data_source = st.radio("Fuente de datos:", ["Archivo CSV", "Yahoo Finance API", "Alpha Vantage API", "Marketstack API", "Finage API", "Finnhub API"])
+    data_source = st.radio("Fuente de datos:", ["Archivo CSV", "Yahoo Finance API", "Alpha Vantage API", "Marketstack API", "Finage API", "Finnhub API", "Tiingo API"])
     
     if data_source == "Archivo CSV":
         st.subheader("📁 Subir archivo CSV")
@@ -763,6 +763,353 @@ if step == "Upload":
             except Exception as e:
                 st.error(f"Error descargando desde Finnhub: {e}")
                 st.info("Verifica que el símbolo sea correcto y esté disponible en Finnhub")
+    
+    elif data_source == "Tiingo API":
+        st.subheader("⚡ Tiingo API - Streaming en Tiempo Real")
+        
+        # Get API key from environment
+        api_key = os.getenv("TIINGO_API_KEY")
+        if not api_key:
+            st.error("⚠️ Tiingo API key no encontrada. Configura tu API key primero.")
+            st.stop()
+        
+        # Data mode selection
+        data_mode = st.radio("Modo de datos:", ["📊 Datos Históricos (REST)", "🔄 Streaming en Tiempo Real (WebSocket)"])
+        
+        if data_mode == "📊 Datos Históricos (REST)":
+            st.subheader("📈 Datos Históricos con Tiingo")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                asset_type = st.selectbox("Tipo de activo:", ["Stocks", "Crypto", "Forex", "Fundos"])
+            with col2:
+                period = st.selectbox("Período:", ["1M", "3M", "6M", "1Y", "2Y", "5Y"], index=3)
+            
+            # Asset-specific symbol input and popular symbols
+            if asset_type == "Stocks":
+                symbol = st.text_input("Símbolo de acción:", value="AAPL", help="Ej: AAPL, GOOGL, MSFT")
+                
+                st.subheader("📊 Acciones populares")
+                stock_symbols = {
+                    "Large Cap": ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "META", "NVDA"],
+                    "Tech": ["AAPL", "MSFT", "GOOGL", "META", "NVDA", "CRM", "ADBE"],
+                    "Finance": ["JPM", "BAC", "WFC", "GS", "V", "MA"],
+                    "Healthcare": ["JNJ", "UNH", "PFE", "ABBV", "TMO"]
+                }
+                selected_category = st.selectbox("Categoría:", list(stock_symbols.keys()))
+                selected_stock = st.selectbox("O selecciona:", [""] + stock_symbols[selected_category])
+                if selected_stock:
+                    symbol = selected_stock
+                    
+            elif asset_type == "Crypto":
+                symbol = st.text_input("Par cripto:", value="btcusd", help="Formato: btcusd, ethusd, etc.")
+                
+                st.subheader("₿ Criptomonedas populares")
+                crypto_pairs = ["btcusd", "ethusd", "adausd", "dotusd", "ltcusd", "xrpusd", "linkusd", "bnbusd"]
+                selected_crypto = st.selectbox("O selecciona un par:", [""] + crypto_pairs)
+                if selected_crypto:
+                    symbol = selected_crypto
+                    
+            elif asset_type == "Forex":
+                symbol = st.text_input("Par de divisas:", value="eurusd", help="Formato: eurusd, gbpusd, etc.")
+                
+                st.subheader("💱 Pares de divisas principales")
+                forex_pairs = ["eurusd", "gbpusd", "usdjpy", "usdchf", "audusd", "usdcad", "nzdusd"]
+                selected_forex = st.selectbox("O selecciona un par:", [""] + forex_pairs)
+                if selected_forex:
+                    symbol = selected_forex
+                    
+            elif asset_type == "Fundos":
+                symbol = st.text_input("Símbolo de fondo:", value="SPY", help="Ej: SPY, QQQ, VTI")
+                
+                st.subheader("📈 ETFs populares")
+                fund_symbols = ["SPY", "QQQ", "VTI", "IWM", "EFA", "EEM", "AGG", "GLD"]
+                selected_fund = st.selectbox("O selecciona un ETF:", [""] + fund_symbols)
+                if selected_fund:
+                    symbol = selected_fund
+            
+            if st.button("Descargar datos históricos Tiingo"):
+                try:
+                    with st.spinner(f"Descargando {symbol} desde Tiingo..."):
+                        # Calculate date range
+                        end_date = datetime.now()
+                        if period == "1M":
+                            start_date = end_date - timedelta(days=30)
+                        elif period == "3M":
+                            start_date = end_date - timedelta(days=90)
+                        elif period == "6M":
+                            start_date = end_date - timedelta(days=180)
+                        elif period == "1Y":
+                            start_date = end_date - timedelta(days=365)
+                        elif period == "2Y":
+                            start_date = end_date - timedelta(days=730)
+                        elif period == "5Y":
+                            start_date = end_date - timedelta(days=1825)
+                        
+                        start_str = start_date.strftime("%Y-%m-%d")
+                        end_str = end_date.strftime("%Y-%m-%d")
+                        
+                        # Build API URL based on asset type
+                        if asset_type == "Stocks":
+                            url = f"https://api.tiingo.com/tiingo/daily/{symbol}/prices"
+                            params = {
+                                'startDate': start_str,
+                                'endDate': end_str,
+                                'token': api_key
+                            }
+                        elif asset_type == "Crypto":
+                            url = f"https://api.tiingo.com/tiingo/crypto/prices"
+                            params = {
+                                'tickers': symbol,
+                                'startDate': start_str,
+                                'endDate': end_str,
+                                'resampleFreq': '1day',
+                                'token': api_key
+                            }
+                        elif asset_type == "Forex":
+                            url = f"https://api.tiingo.com/tiingo/fx/{symbol}/prices"
+                            params = {
+                                'startDate': start_str,
+                                'endDate': end_str,
+                                'resampleFreq': '1day',
+                                'token': api_key
+                            }
+                        elif asset_type == "Fundos":
+                            url = f"https://api.tiingo.com/tiingo/daily/{symbol}/prices"
+                            params = {
+                                'startDate': start_str,
+                                'endDate': end_str,
+                                'token': api_key
+                            }
+                        
+                        # Make API request
+                        response = requests.get(url, params=params)
+                        
+                        if response.status_code == 200:
+                            json_data = response.json()
+                            
+                            if json_data and len(json_data) > 0:
+                                # Process data based on asset type
+                                df_data = []
+                                
+                                if asset_type in ["Stocks", "Fundos"]:
+                                    for item in json_data:
+                                        df_data.append({
+                                            'date': pd.to_datetime(item['date']),
+                                            'open': item['open'],
+                                            'high': item['high'],
+                                            'low': item['low'],
+                                            'close': item['close'],
+                                            'volume': item['volume']
+                                        })
+                                elif asset_type == "Crypto":
+                                    # Crypto data comes nested
+                                    for item in json_data:
+                                        if 'priceData' in item:
+                                            for price_item in item['priceData']:
+                                                df_data.append({
+                                                    'date': pd.to_datetime(price_item['date']),
+                                                    'open': price_item['open'],
+                                                    'high': price_item['high'],
+                                                    'low': price_item['low'],
+                                                    'close': price_item['close'],
+                                                    'volume': price_item.get('volume', 0)
+                                                })
+                                elif asset_type == "Forex":
+                                    for item in json_data:
+                                        df_data.append({
+                                            'date': pd.to_datetime(item['date']),
+                                            'open': item['open'],
+                                            'high': item['high'],
+                                            'low': item['low'],
+                                            'close': item['close'],
+                                            'volume': 0  # Forex doesn't have volume
+                                        })
+                                
+                                if df_data:
+                                    data = pd.DataFrame(df_data)
+                                    data = data.set_index('date').sort_index()
+                                    
+                                    st.success(f"✅ Datos de {symbol} descargados desde Tiingo")
+                                    st.info(f"🎯 **{symbol.upper()}** - Tiingo {asset_type} Data | Período: {period}")
+                                    
+                                    # Show data preview
+                                    st.dataframe(data.head())
+                                    
+                                    # Select target column
+                                    available_cols = list(data.columns)
+                                    default_col = "close" if "close" in available_cols else available_cols[0]
+                                    target_col = st.selectbox("Columna a analizar:", available_cols, 
+                                                            index=available_cols.index(default_col))
+                                    
+                                    if st.button("Procesar datos Tiingo"):
+                                        # Process the data
+                                        st.session_state.data = data
+                                        st.session_state.target_col = target_col
+                                        st.session_state.symbol = symbol
+                                        st.session_state.data_source = "Tiingo"
+                                        st.success(f"Datos de {symbol} procesados desde Tiingo")
+                                        
+                                        # Show basic stats
+                                        col1, col2, col3 = st.columns(3)
+                                        with col1:
+                                            st.metric("Registros", len(data))
+                                        with col2:
+                                            start_date = data.index.min().strftime("%Y-%m-%d")
+                                            st.metric("Desde", start_date)
+                                        with col3:
+                                            end_date = data.index.max().strftime("%Y-%m-%d")
+                                            st.metric("Hasta", end_date)
+                                else:
+                                    st.error("No se pudieron procesar los datos recibidos")
+                            else:
+                                st.error(f"No se encontraron datos para {symbol}")
+                                
+                        else:
+                            st.error(f"Error API: {response.status_code}")
+                            if response.status_code == 401:
+                                st.error("Error de autenticación. Verifica la API key de Tiingo.")
+                            elif response.status_code == 403:
+                                st.error("Acceso denegado. Verifica permisos de tu API key.")
+                            elif response.status_code == 404:
+                                st.error(f"Símbolo {symbol} no encontrado.")
+                            else:
+                                try:
+                                    error_data = response.json()
+                                    st.error(f"Error: {error_data}")
+                                except:
+                                    st.error("Error desconocido de la API")
+                                    
+                except Exception as e:
+                    st.error(f"Error descargando desde Tiingo: {e}")
+                    st.info("Verifica que el símbolo sea correcto y esté disponible en Tiingo")
+        
+        else:  # Streaming mode
+            st.subheader("🔄 Streaming en Tiempo Real")
+            
+            # WebSocket streaming controls
+            col1, col2 = st.columns(2)
+            with col1:
+                stream_type = st.selectbox("Tipo de stream:", ["Crypto", "Forex", "IEX Stocks"])
+            with col2:
+                symbol = st.text_input("Símbolo:", value="btcusd" if stream_type == "Crypto" else "eurusd" if stream_type == "Forex" else "AAPL")
+            
+            # Streaming symbols by type
+            if stream_type == "Crypto":
+                st.subheader("₿ Crypto streaming disponible")
+                crypto_symbols = ["btcusd", "ethusd", "adausd", "dotusd", "ltcusd", "xrpusd", "linkusd"]
+                selected_crypto = st.selectbox("Cryptos populares:", [""] + crypto_symbols)
+                if selected_crypto:
+                    symbol = selected_crypto
+                    
+            elif stream_type == "Forex":
+                st.subheader("💱 Forex streaming disponible")
+                forex_symbols = ["eurusd", "gbpusd", "usdjpy", "usdchf", "audusd", "usdcad"]
+                selected_forex = st.selectbox("Pares principales:", [""] + forex_symbols)
+                if selected_forex:
+                    symbol = selected_forex
+                    
+            elif stream_type == "IEX Stocks":
+                st.subheader("📊 Stocks streaming IEX")
+                stock_symbols = ["AAPL", "MSFT", "GOOGL", "TSLA", "AMZN", "META", "NVDA"]
+                selected_stock = st.selectbox("Acciones principales:", [""] + stock_symbols)
+                if selected_stock:
+                    symbol = selected_stock
+            
+            # Streaming controls
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                start_stream = st.button("🚀 Iniciar Stream")
+            with col2:
+                pause_stream = st.button("⏸️ Pausar")
+            with col3:
+                stop_stream = st.button("🛑 Detener")
+            
+            # Initialize streaming state
+            if 'streaming_active' not in st.session_state:
+                st.session_state.streaming_active = False
+            if 'stream_data' not in st.session_state:
+                st.session_state.stream_data = []
+            
+            # Streaming logic (placeholder for WebSocket implementation)
+            if start_stream:
+                st.session_state.streaming_active = True
+                st.success(f"🎯 Stream iniciado para {symbol} ({stream_type})")
+                st.info("⚡ Simulación de datos en tiempo real activada")
+                
+                # Placeholder for WebSocket connection
+                st.warning("🚧 WebSocket streaming en desarrollo. Conexión simulada:")
+                
+                if stream_type == "Crypto":
+                    ws_url = f"wss://api.tiingo.com/crypto"
+                elif stream_type == "Forex":
+                    ws_url = f"wss://api.tiingo.com/fx"
+                elif stream_type == "IEX Stocks":
+                    ws_url = f"wss://api.tiingo.com/iex"
+                
+                st.code(f"Conectando a: {ws_url}")
+                st.code(f"Suscrito a: {symbol}")
+                st.code(f"API Key: ***{api_key[-8:]}")
+                
+                # Real-time data placeholder
+                placeholder = st.empty()
+                
+                # Simulate real-time updates
+                import time
+                for i in range(5):
+                    with placeholder.container():
+                        col1, col2, col3, col4 = st.columns(4)
+                        with col1:
+                            st.metric("Precio", f"${100 + i * 0.5:.2f}")
+                        with col2:
+                            st.metric("Volumen", f"{1000 + i * 10}")
+                        with col3:
+                            st.metric("Cambio", f"+{i * 0.1:.1f}%")
+                        with col4:
+                            st.metric("Timestamp", datetime.now().strftime("%H:%M:%S"))
+                    time.sleep(1)
+            
+            if pause_stream:
+                st.session_state.streaming_active = False
+                st.warning("⏸️ Stream pausado")
+            
+            if stop_stream:
+                st.session_state.streaming_active = False
+                st.session_state.stream_data = []
+                st.error("🛑 Stream detenido y datos limpiados")
+            
+            # News integration
+            st.subheader("📰 Noticias Financieras en Tiempo Real")
+            
+            if st.button("📈 Cargar últimas noticias"):
+                try:
+                    with st.spinner("Cargando noticias desde Tiingo..."):
+                        news_url = "https://api.tiingo.com/tiingo/news"
+                        news_params = {
+                            'token': api_key,
+                            'limit': 10,
+                            'offset': 0
+                        }
+                        
+                        news_response = requests.get(news_url, params=news_params)
+                        
+                        if news_response.status_code == 200:
+                            news_data = news_response.json()
+                            
+                            st.success("📰 Últimas noticias cargadas")
+                            
+                            for article in news_data[:5]:  # Show first 5 articles
+                                with st.expander(f"📄 {article.get('title', 'Sin título')}"):
+                                    st.write(f"**Fuente:** {article.get('source', 'N/A')}")
+                                    st.write(f"**Fecha:** {article.get('publishedDate', 'N/A')}")
+                                    st.write(f"**Descripción:** {article.get('description', 'Sin descripción')}")
+                                    if article.get('url'):
+                                        st.link_button("🔗 Leer más", article['url'])
+                        else:
+                            st.error(f"Error cargando noticias: {news_response.status_code}")
+                            
+                except Exception as e:
+                    st.error(f"Error cargando noticias: {e}")
 
 # Step 2: Visualize
 elif step == "Visualize":
