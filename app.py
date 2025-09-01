@@ -6,7 +6,9 @@ from statsmodels.tsa.stattools import adfuller
 from statsmodels.tsa.arima.model import ARIMA
 import statsmodels.api as sm
 import yfinance as yf
+from alpha_vantage.timeseries import TimeSeries
 from datetime import datetime, timedelta
+import os
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -100,7 +102,7 @@ if step == "Upload":
     st.header("1. Cargar Datos")
     
     # Data source selection
-    data_source = st.radio("Fuente de datos:", ["Archivo CSV", "Yahoo Finance API"])
+    data_source = st.radio("Fuente de datos:", ["Archivo CSV", "Yahoo Finance API", "Alpha Vantage API"])
     
     if data_source == "Archivo CSV":
         st.subheader("📁 Subir archivo CSV")
@@ -124,7 +126,7 @@ if step == "Upload":
             except Exception as e:
                 st.error(f"Error: {e}")
     
-    else:  # Yahoo Finance API
+    elif data_source == "Yahoo Finance API":
         st.subheader("📈 Yahoo Finance API")
         
         col1, col2 = st.columns(2)
@@ -196,6 +198,121 @@ if step == "Upload":
             except Exception as e:
                 st.error(f"Error descargando datos: {e}")
                 st.info("Verifica que el símbolo sea correcto (ej: AAPL para Apple)")
+    
+    elif data_source == "Alpha Vantage API":
+        st.subheader("💎 Alpha Vantage API")
+        
+        # Check if API key is available
+        api_key = os.getenv("ALPHA_VANTAGE_API_KEY")
+        if not api_key:
+            st.warning("⚠️ Alpha Vantage API key no encontrada. Por favor configura tu API key.")
+            st.info("Puedes obtener tu API key gratis en: https://www.alphavantage.co/support/#api-key")
+        else:
+            col1, col2 = st.columns(2)
+            with col1:
+                symbol = st.text_input("Símbolo", value="IBM", help="Ej: IBM, AAPL, TSCO.LON")
+            with col2:
+                output_size = st.selectbox("Tamaño de datos", ["compact", "full"], 
+                                         help="compact: últimos 100 días, full: 20+ años")
+            
+            # Global market examples
+            st.subheader("🌍 Mercados globales soportados")
+            global_examples = {
+                "Estados Unidos": ["IBM", "AAPL", "GOOGL"],
+                "Reino Unido": ["TSCO.LON", "BP.LON"],
+                "Canadá": ["SHOP.TRT", "GPV.TRV"],
+                "Alemania": ["MBG.DEX"],
+                "India": ["RELIANCE.BSE"],
+                "China": ["600104.SHH", "000002.SHZ"]
+            }
+            
+            selected_market = st.selectbox("Mercado:", list(global_examples.keys()))
+            selected_global = st.selectbox("O selecciona un símbolo:", [""] + global_examples[selected_market])
+            
+            if selected_global:
+                symbol = selected_global
+            
+            # Data type selection
+            st.subheader("📊 Tipo de datos")
+            data_function = st.selectbox("Función:", [
+                "TIME_SERIES_DAILY",
+                "TIME_SERIES_WEEKLY", 
+                "TIME_SERIES_MONTHLY",
+                "TIME_SERIES_INTRADAY"
+            ], help="Daily es recomendado para ARIMA")
+            
+            interval = None
+            if data_function == "TIME_SERIES_INTRADAY":
+                interval = st.selectbox("Intervalo:", ["1min", "5min", "15min", "30min", "60min"])
+            
+            if st.button("Descargar desde Alpha Vantage"):
+                try:
+                    with st.spinner(f"Descargando {symbol} desde Alpha Vantage..."):
+                        ts = TimeSeries(key=api_key, output_format='pandas')
+                        
+                        if data_function == "TIME_SERIES_DAILY":
+                            data, meta_data = ts.get_daily(symbol=symbol, outputsize=output_size)
+                        elif data_function == "TIME_SERIES_WEEKLY":
+                            data, meta_data = ts.get_weekly(symbol=symbol)
+                        elif data_function == "TIME_SERIES_MONTHLY":
+                            data, meta_data = ts.get_monthly(symbol=symbol)
+                        elif data_function == "TIME_SERIES_INTRADAY" and interval:
+                            data, meta_data = ts.get_intraday(symbol=symbol, interval=interval, outputsize=output_size)
+                        else:
+                            st.error("Función no soportada o intervalo no especificado")
+                            st.stop()
+                        
+                        if data is None or data.empty:
+                            st.error(f"No se encontraron datos para {symbol}")
+                        else:
+                            st.success(f"Datos de {symbol} descargados desde Alpha Vantage")
+                            
+                            # Show meta data
+                            st.info(f"📊 **{meta_data.get('2. Symbol', symbol)}** - {meta_data.get('1. Information', 'Alpha Vantage Data')}")
+                            
+                            # Clean column names (remove numbers and dots)
+                            data.columns = [col.split('. ')[1] if '. ' in col else col for col in data.columns]
+                            
+                            # Sort by date (newest first in Alpha Vantage, we want oldest first)
+                            data = data.sort_index()
+                            
+                            # Show data preview
+                            st.dataframe(data.head())
+                            
+                            # Select target column
+                            available_cols = list(data.columns)
+                            default_col = "close" if "close" in available_cols else available_cols[0]
+                            target_col = st.selectbox("Columna a analizar:", available_cols, 
+                                                    index=available_cols.index(default_col) if default_col in available_cols else 0)
+                            
+                            if st.button("Procesar datos Alpha Vantage"):
+                                # Process the data
+                                st.session_state.data = data
+                                st.session_state.target_col = target_col
+                                st.session_state.symbol = symbol
+                                st.session_state.data_source = "Alpha Vantage"
+                                st.success(f"Datos de {symbol} procesados desde Alpha Vantage")
+                                
+                                # Show basic stats
+                                col1, col2, col3 = st.columns(3)
+                                with col1:
+                                    st.metric("Registros", len(data))
+                                with col2:
+                                    try:
+                                        start_date = data.index.min().strftime("%Y-%m-%d")
+                                    except:
+                                        start_date = str(data.index.min())[:10]
+                                    st.metric("Desde", start_date)
+                                with col3:
+                                    try:
+                                        end_date = data.index.max().strftime("%Y-%m-%d")
+                                    except:
+                                        end_date = str(data.index.max())[:10]
+                                    st.metric("Hasta", end_date)
+                                    
+                except Exception as e:
+                    st.error(f"Error descargando desde Alpha Vantage: {e}")
+                    st.info("Verifica que el símbolo sea correcto y que tengas acceso a Alpha Vantage")
 
 # Step 2: Visualize
 elif step == "Visualize":
