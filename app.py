@@ -5,6 +5,8 @@ import plotly.graph_objects as go
 from statsmodels.tsa.stattools import adfuller
 from statsmodels.tsa.arima.model import ARIMA
 import statsmodels.api as sm
+import yfinance as yf
+from datetime import datetime, timedelta
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -97,25 +99,103 @@ def auto_arima_tuning(data, max_p=3, max_d=2, max_q=3):
 if step == "Upload":
     st.header("1. Cargar Datos")
     
-    file = st.file_uploader("Sube tu archivo CSV", type=['csv'])
+    # Data source selection
+    data_source = st.radio("Fuente de datos:", ["Archivo CSV", "Yahoo Finance API"])
     
-    if file:
-        try:
-            df = pd.read_csv(file)
-            st.success("Archivo cargado correctamente")
-            st.dataframe(df.head())
-            
-            date_col = st.selectbox("Columna de fecha", df.columns)
-            target_col = st.selectbox("Columna objetivo", [c for c in df.columns if c != date_col])
-            
-            if st.button("Procesar datos"):
-                df[date_col] = pd.to_datetime(df[date_col])
-                df = df.set_index(date_col).sort_index()
-                st.session_state.data = df
-                st.session_state.target_col = target_col
-                st.success("Datos procesados correctamente")
-        except Exception as e:
-            st.error(f"Error: {e}")
+    if data_source == "Archivo CSV":
+        st.subheader("📁 Subir archivo CSV")
+        file = st.file_uploader("Sube tu archivo CSV", type=['csv'])
+        
+        if file:
+            try:
+                df = pd.read_csv(file)
+                st.success("Archivo cargado correctamente")
+                st.dataframe(df.head())
+                
+                date_col = st.selectbox("Columna de fecha", df.columns)
+                target_col = st.selectbox("Columna objetivo", [c for c in df.columns if c != date_col])
+                
+                if st.button("Procesar datos CSV"):
+                    df[date_col] = pd.to_datetime(df[date_col])
+                    df = df.set_index(date_col).sort_index()
+                    st.session_state.data = df
+                    st.session_state.target_col = target_col
+                    st.success("Datos procesados correctamente")
+            except Exception as e:
+                st.error(f"Error: {e}")
+    
+    else:  # Yahoo Finance API
+        st.subheader("📈 Yahoo Finance API")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            symbol = st.text_input("Símbolo de acción", value="AAPL", help="Ej: AAPL, GOOGL, TSLA, MSFT")
+        with col2:
+            period = st.selectbox("Período", ["1y", "2y", "5y", "10y", "max"], index=2)
+        
+        # Popular symbols for quick selection
+        st.subheader("📊 Símbolos populares")
+        popular_symbols = ["AAPL", "GOOGL", "MSFT", "TSLA", "AMZN", "META", "NVDA", "NFLX"]
+        selected_popular = st.selectbox("O selecciona uno popular:", [""] + popular_symbols)
+        
+        if selected_popular:
+            symbol = selected_popular
+        
+        if st.button("Descargar datos"):
+            try:
+                with st.spinner(f"Descargando datos de {symbol}..."):
+                    # Download data from Yahoo Finance
+                    ticker = yf.Ticker(symbol)
+                    df = ticker.history(period=period)
+                    
+                    if df.empty:
+                        st.error(f"No se encontraron datos para {symbol}")
+                    else:
+                        st.success(f"Datos de {symbol} descargados correctamente")
+                        
+                        # Show info about the stock
+                        try:
+                            info = ticker.info
+                            company_name = info.get('longName', symbol)
+                            st.info(f"📊 **{company_name}** ({symbol})")
+                        except:
+                            st.info(f"📊 **{symbol}**")
+                        
+                        # Show data preview
+                        st.dataframe(df.head())
+                        
+                        # Select target column
+                        target_col = st.selectbox("Columna a analizar:", 
+                                                ["Close", "Open", "High", "Low", "Volume"], 
+                                                index=0)
+                        
+                        if st.button("Procesar datos API"):
+                            # Process the data
+                            st.session_state.data = df
+                            st.session_state.target_col = target_col
+                            st.session_state.symbol = symbol
+                            st.success(f"Datos de {symbol} procesados correctamente")
+                            
+                            # Show basic stats
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                st.metric("Registros", len(df))
+                            with col2:
+                                try:
+                                    start_date = df.index.min().strftime("%Y-%m-%d")
+                                except:
+                                    start_date = str(df.index.min())[:10]
+                                st.metric("Desde", start_date)
+                            with col3:
+                                try:
+                                    end_date = df.index.max().strftime("%Y-%m-%d")
+                                except:
+                                    end_date = str(df.index.max())[:10]
+                                st.metric("Hasta", end_date)
+                            
+            except Exception as e:
+                st.error(f"Error descargando datos: {e}")
+                st.info("Verifica que el símbolo sea correcto (ej: AAPL para Apple)")
 
 # Step 2: Visualize
 elif step == "Visualize":
@@ -125,19 +205,26 @@ elif step == "Visualize":
         df = st.session_state.data
         target = st.session_state.target_col
         
-        st.subheader("Serie de tiempo")
+        # Show symbol info if available
+        if hasattr(st.session_state, 'symbol'):
+            st.subheader(f"Serie de tiempo - {st.session_state.symbol} ({target})")
+        else:
+            st.subheader(f"Serie de tiempo - {target}")
+        
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=df.index, y=df[target], mode='lines', name=target))
-        fig.update_layout(height=400)
+        fig.update_layout(height=400, title=f"{target} Over Time")
         st.plotly_chart(fig, use_container_width=True)
         
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
             st.metric("Media", f"{df[target].mean():.2f}")
         with col2:
             st.metric("Desv. Std", f"{df[target].std():.2f}")
         with col3:
             st.metric("Puntos", len(df))
+        with col4:
+            st.metric("Rango", f"{df[target].max() - df[target].min():.2f}")
     else:
         st.warning("Carga los datos primero")
 
