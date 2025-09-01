@@ -63,10 +63,15 @@ def perform_adf_test(data, title="ADF Test Results"):
             
         with col2:
             st.write("**Critical Values:**")
-            if len(dftest) > 4 and isinstance(dftest[4], dict):
-                for key, val in dftest[4].items():
-                    st.write(f"• {key}: {val:.6f}")
-            else:
+            try:
+                # ADF test returns: (adf_stat, p_value, usedlag, nobs, critical_values, icbest)
+                critical_values = dftest[4] if len(dftest) > 4 else None
+                if critical_values and isinstance(critical_values, dict):
+                    for key, val in critical_values.items():
+                        st.write(f"• {key}: {val:.6f}")
+                else:
+                    st.write("• Critical values not available")
+            except Exception:
                 st.write("• Critical values not available")
         
         # Interpretation
