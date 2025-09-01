@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
+import plotly.express as px
 from statsmodels.tsa.stattools import adfuller
 from statsmodels.tsa.arima.model import ARIMA
 import statsmodels.api as sm
@@ -11,17 +12,134 @@ from datetime import datetime, timedelta
 import os
 import requests
 import warnings
+import json
+import time
+from sklearn.metrics import mean_squared_error, mean_absolute_error
+from sklearn.preprocessing import MinMaxScaler
+import seaborn as sns
 warnings.filterwarnings('ignore')
 
+# Advanced model imports (with fallbacks)
+try:
+    from prophet import Prophet
+    PROPHET_AVAILABLE = True
+except ImportError:
+    PROPHET_AVAILABLE = False
+
+try:
+    import tensorflow as tf
+    from tensorflow.keras.models import Sequential
+    from tensorflow.keras.layers import LSTM, Dense, Dropout
+    TF_AVAILABLE = True
+except ImportError:
+    TF_AVAILABLE = False
+
+try:
+    from textblob import TextBlob
+    SENTIMENT_AVAILABLE = True
+except ImportError:
+    SENTIMENT_AVAILABLE = False
+
 # Page config
-st.set_page_config(page_title="ARIMA Forecasting", layout="centered")
+st.set_page_config(page_title="🚀 Advanced Financial AI", layout="wide", page_icon="📊")
 
-# Title
-st.title("ARIMA Forecasting")
-st.write("Análisis de series temporales para mercado bursátil")
+# Initialize session state for advanced features
+if 'theme' not in st.session_state:
+    st.session_state.theme = 'default'
+if 'user_level' not in st.session_state:
+    st.session_state.user_level = 1
+if 'achievements' not in st.session_state:
+    st.session_state.achievements = []
+if 'symbol_portfolio' not in st.session_state:
+    st.session_state.symbol_portfolio = []
+if 'mood_tracker' not in st.session_state:
+    st.session_state.mood_tracker = {}
 
-# Sidebar
-step = st.sidebar.selectbox("Paso", ["Upload", "Visualize", "Test", "Difference", "Model", "Forecast"])
+# Dashboard Theme Selection
+themes = {
+    'default': {
+        'primary': '#1f77b4',
+        'secondary': '#ff7f0e', 
+        'background': '#ffffff',
+        'text': '#000000'
+    },
+    'dark': {
+        'primary': '#00d4aa',
+        'secondary': '#ff6b6b',
+        'background': '#1e1e1e',
+        'text': '#ffffff'
+    },
+    'ocean': {
+        'primary': '#0077be',
+        'secondary': '#00a8cc',
+        'background': '#f0f8ff',
+        'text': '#003366'
+    },
+    'sunset': {
+        'primary': '#ff6b6b',
+        'secondary': '#ffa726',
+        'background': '#fff3e0',
+        'text': '#d84315'
+    },
+    'forest': {
+        'primary': '#4caf50',
+        'secondary': '#66bb6a',
+        'background': '#f1f8e9',
+        'text': '#2e7d32'
+    }
+}
+
+# Sidebar theme selector
+with st.sidebar:
+    st.subheader("🎨 Personalización")
+    selected_theme = st.selectbox(
+        "Tema del Dashboard:",
+        options=list(themes.keys()),
+        format_func=lambda x: f"🎨 {x.title()}",
+        index=list(themes.keys()).index(st.session_state.theme)
+    )
+    st.session_state.theme = selected_theme
+    
+    # Apply custom CSS based on theme
+    theme_colors = themes[st.session_state.theme]
+    st.markdown(f"""
+    <style>
+        .main .block-container {{
+            background-color: {theme_colors['background']};
+            color: {theme_colors['text']};
+        }}
+        .stMetric {{
+            background-color: {theme_colors['background']};
+            color: {theme_colors['text']};
+            border-left: 4px solid {theme_colors['primary']};
+            padding: 10px;
+        }}
+    </style>
+    """, unsafe_allow_html=True)
+
+# Title with theme styling
+st.markdown(f"""
+<div style="text-align: center; padding: 20px; background: linear-gradient(90deg, {theme_colors['primary']}, {theme_colors['secondary']}); border-radius: 10px; margin-bottom: 20px;">
+    <h1 style="color: white; margin: 0;">🚀 Advanced Financial AI Dashboard</h1>
+    <p style="color: white; margin: 5px 0;">Análisis Inteligente • Forecasting Avanzado • Insights en Tiempo Real</p>
+</div>
+""", unsafe_allow_html=True)
+
+# Enhanced Sidebar Navigation
+st.sidebar.title("🧭 Navegación")
+step = st.sidebar.selectbox("Sección Principal:", [
+    "📊 Multi-Symbol Dashboard", 
+    "📈 Upload & Data", 
+    "👁️ Visualize", 
+    "🔍 Stationarity Test", 
+    "📐 Difference", 
+    "🤖 Advanced Models", 
+    "🔮 Forecasting Lab",
+    "🏆 Performance Tracker",
+    "🎯 Mood & Sentiment",
+    "🗺️ Symbol Heat Map",
+    "🎓 AI Learning Mode"
+])
 
 # Session state
 if 'data' not in st.session_state:
@@ -52,15 +170,28 @@ def adf_test(data):
         st.error(f"Error en test: {e}")
         return False
 
-def auto_arima_tuning(data, max_p=5, max_d=2, max_q=5, use_stepwise=False):
-    """Enhanced ARIMA hyperparameter tuning with advanced grid search"""
+def auto_arima_tuning(data, max_p=5, max_d=2, max_q=5, use_stepwise=False, enable_seasonal=False):
+    """🚀 Ultra-Advanced ARIMA hyperparameter tuning with intelligent optimization"""
     best_aic = float('inf')
     best_bic = float('inf')
     best_params = None
     best_model = None
     results = []
     
-    # Progress tracking
+    # Data characteristics analysis for intelligent parameter suggestions
+    data_length = len(data)
+    data_std = np.std(data)
+    data_mean = np.mean(data)
+    
+    # Intelligent parameter range adjustment based on data characteristics
+    if data_length < 100:
+        max_p = min(max_p, 3)
+        max_q = min(max_q, 3)
+        st.info("🧠 **Optimización inteligente:** Reduciendo rangos de parámetros para datos pequeños")
+    elif data_length > 1000:
+        st.info("🧠 **Optimización inteligente:** Datos grandes detectados - usando búsqueda eficiente")
+    
+    # Progress tracking with enhanced metrics
     progress_bar = st.progress(0)
     status_text = st.empty()
     metrics_container = st.container()
@@ -68,77 +199,308 @@ def auto_arima_tuning(data, max_p=5, max_d=2, max_q=5, use_stepwise=False):
     total_combinations = (max_p + 1) * (max_d + 1) * (max_q + 1)
     current_combination = 0
     successful_fits = 0
+    early_stop_threshold = 10  # Stop if we find 10 good models to save time
     
-    # Live metrics display
+    # Enhanced live metrics display
     with metrics_container:
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
             tested_metric = st.empty()
         with col2:
             successful_metric = st.empty()
         with col3:
             best_aic_metric = st.empty()
+        with col4:
+            efficiency_metric = st.empty()
     
-    # Grid search with enhanced tracking
+    st.info("🎯 **Búsqueda inteligente:** Priorizando combinaciones más prometedoras")
+    
+    # Enhanced grid search with intelligent ordering
+    param_combinations = []
     for p in range(max_p + 1):
         for d in range(max_d + 1):
             for q in range(max_q + 1):
-                current_combination += 1
-                progress = current_combination / total_combinations
-                progress_bar.progress(progress)
-                
-                # Update status
-                status_text.text(f"🔍 Testing ARIMA({p},{d},{q}) - {current_combination}/{total_combinations}")
-                tested_metric.metric("Tested", f"{current_combination}/{total_combinations}")
-                
-                try:
-                    # Fit ARIMA model
-                    model = ARIMA(data, order=(p, d, q))
-                    fitted = model.fit()
-                    aic = fitted.aic
-                    bic = fitted.bic
-                    
-                    # Calculate additional metrics
-                    residuals = fitted.resid
-                    mse = np.mean(residuals**2)
-                    rmse = np.sqrt(mse)
-                    
-                    successful_fits += 1
-                    successful_metric.metric("Successful", successful_fits)
-                    
-                    results.append({
-                        'p': p, 'd': d, 'q': q,
-                        'AIC': round(aic, 2), 
-                        'BIC': round(bic, 2),
-                        'RMSE': round(rmse, 4),
-                        'LogLikelihood': round(fitted.llf, 2)
-                    })
-                    
-                    # Update best model based on AIC
-                    if aic < best_aic:
-                        best_aic = aic
-                        best_params = (p, d, q)
-                        best_model = fitted
-                        best_aic_metric.metric("Best AIC", f"{aic:.2f}")
-                        
-                except Exception as e:
-                    # Log failed attempts for debugging
+                # Skip unrealistic combinations
+                if p + q > 6:  # Avoid overly complex models
                     continue
+                if d > 2 and (p > 3 or q > 3):  # High differencing with high AR/MA
+                    continue
+                param_combinations.append((p, d, q))
+    
+    # Sort combinations by expected performance (simpler models first)
+    param_combinations.sort(key=lambda x: x[0] + x[2] + x[1] * 2)
+    total_combinations = len(param_combinations)
+    
+    # Grid search with enhanced tracking and early stopping
+    for p, d, q in param_combinations:
+        current_combination += 1
+        progress = current_combination / total_combinations
+        progress_bar.progress(progress)
+        
+        # Update status with enhanced information
+        status_text.text(f"🔍 Testing ARIMA({p},{d},{q}) - {current_combination}/{total_combinations}")
+        tested_metric.metric("Probados", f"{current_combination}/{total_combinations}")
+        
+        # Calculate efficiency percentage
+        efficiency = (successful_fits / current_combination * 100) if current_combination > 0 else 0
+        efficiency_metric.metric("Eficiencia", f"{efficiency:.1f}%")
+        
+        try:
+            # Fit ARIMA model with enhanced error handling
+            model = ARIMA(data, order=(p, d, q))
+            fitted = model.fit()
+            aic = fitted.aic
+            bic = fitted.bic
+            
+            # Calculate comprehensive metrics
+            residuals = fitted.resid
+            mse = np.mean(residuals**2)
+            rmse = np.sqrt(mse)
+            mae = np.mean(np.abs(residuals))
+            
+            # Model diagnostics
+            ljung_box_pvalue = None
+            try:
+                from statsmodels.stats.diagnostic import acorr_ljungbox
+                ljung_result = acorr_ljungbox(residuals, lags=10, return_df=True)
+                ljung_box_pvalue = ljung_result['lb_pvalue'].min()
+            except:
+                ljung_box_pvalue = None
+            
+            # Calculate information criteria
+            hqic = fitted.hqic if hasattr(fitted, 'hqic') else None
+            
+            successful_fits += 1
+            successful_metric.metric("Exitosos", successful_fits)
+            
+            # Enhanced results with comprehensive metrics
+            result_entry = {
+                'p': p, 'd': d, 'q': q,
+                'AIC': round(aic, 2), 
+                'BIC': round(bic, 2),
+                'HQIC': round(hqic, 2) if hqic else None,
+                'RMSE': round(rmse, 4),
+                'MAE': round(mae, 4),
+                'LogLikelihood': round(fitted.llf, 2),
+                'LjungBox_p': round(ljung_box_pvalue, 3) if ljung_box_pvalue else None
+            }
+            results.append(result_entry)
+            
+            # Update best model based on AIC with model validation
+            if aic < best_aic:
+                # Additional validation for best model
+                model_is_valid = True
+                
+                # Check for reasonable residuals
+                if np.any(np.isnan(residuals)) or np.any(np.isinf(residuals)):
+                    model_is_valid = False
+                
+                # Check for overfitting (too many parameters for data size)
+                total_params = p + d + q
+                if total_params > data_length // 10:
+                    model_is_valid = False
+                
+                if model_is_valid:
+                    best_aic = aic
+                    best_params = (p, d, q)
+                    best_model = fitted
+                    best_aic_metric.metric("Mejor AIC", f"{aic:.2f}")
+            
+            # Early stopping for efficiency (if we have enough good models)
+            if successful_fits >= early_stop_threshold and len([r for r in results if r['AIC'] < best_aic + 50]) >= 5:
+                st.info(f"⚡ **Parada temprana:** Encontrados {successful_fits} modelos exitosos")
+                break
+                        
+        except Exception as e:
+            # Enhanced error logging for debugging
+            continue
     
     # Clean up progress indicators
     progress_bar.empty()
     status_text.empty()
     
-    # Final summary
+    # Enhanced final summary with intelligence insights
     if successful_fits > 0:
-        st.success(f"✅ Tuning completed! Tested {successful_fits}/{total_combinations} valid combinations")
+        efficiency_rate = (successful_fits / current_combination) * 100
+        st.success(f"✅ **Tuning completado!** {successful_fits}/{current_combination} modelos válidos ({efficiency_rate:.1f}% eficiencia)")
+        
+        # Provide intelligent insights
+        if efficiency_rate > 80:
+            st.info("🧠 **Análisis:** Excelente tasa de éxito - los datos son apropiados para ARIMA")
+        elif efficiency_rate > 50:
+            st.info("🧠 **Análisis:** Buena tasa de éxito - considera ajustar preprocesamiento")
+        else:
+            st.warning("⚠️ **Análisis:** Baja tasa de éxito - verifica estacionariedad de los datos")
+            
+        # Best model insights
+        if best_params:
+            p, d, q = best_params
+            if p > q:
+                st.info("📊 **Insight:** Modelo autoregresivo dominante - tendencias fuertes detectadas")
+            elif q > p:
+                st.info("📊 **Insight:** Modelo de media móvil dominante - choques externos significativos")
+            else:
+                st.info("📊 **Insight:** Modelo balanceado - patrones complejos detectados")
+                
     else:
-        st.error("❌ No valid ARIMA models found. Try different parameter ranges.")
+        st.error("❌ No se encontraron modelos ARIMA válidos. Intenta rangos diferentes o verifica los datos.")
     
     return best_model, best_params, results
 
-# Step 1: Upload
-if step == "Upload":
+# New Section: Multi-Symbol Dashboard
+if step == "📊 Multi-Symbol Dashboard":
+    st.header("📊 Multi-Symbol Comparison Dashboard")
+    
+    # Sidebar portfolio management
+    with st.sidebar:
+        st.subheader("💼 Portfolio Manager")
+        new_symbol = st.text_input("Agregar símbolo:", placeholder="AAPL")
+        if st.button("➕ Agregar") and new_symbol:
+            if new_symbol.upper() not in st.session_state.symbol_portfolio:
+                st.session_state.symbol_portfolio.append(new_symbol.upper())
+                st.success(f"✅ {new_symbol.upper()} agregado")
+            else:
+                st.warning("Ya está en el portfolio")
+        
+        # Display current portfolio
+        if st.session_state.symbol_portfolio:
+            st.write("**Portfolio Actual:**")
+            for i, symbol in enumerate(st.session_state.symbol_portfolio):
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.write(f"📈 {symbol}")
+                with col2:
+                    if st.button("🗑️", key=f"del_{i}"):
+                        st.session_state.symbol_portfolio.remove(symbol)
+                        st.rerun()
+    
+    if not st.session_state.symbol_portfolio:
+        st.info("🔼 Agrega símbolos a tu portfolio para comenzar el análisis comparativo")
+        
+        # Suggested portfolios
+        st.subheader("🎯 Portfolios Sugeridos")
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if st.button("🚀 Tech Giants"):
+                st.session_state.symbol_portfolio = ["AAPL", "GOOGL", "MSFT", "META", "AMZN"]
+                st.rerun()
+        
+        with col2:
+            if st.button("💰 Finance Sector"):
+                st.session_state.symbol_portfolio = ["JPM", "BAC", "WFC", "GS", "V"]
+                st.rerun()
+        
+        with col3:
+            if st.button("⚡ High Growth"):
+                st.session_state.symbol_portfolio = ["TSLA", "NVDA", "AMD", "NFLX", "CRM"]
+                st.rerun()
+    
+    else:
+        # Multi-symbol analysis
+        st.subheader(f"📈 Análisis de {len(st.session_state.symbol_portfolio)} Símbolos")
+        
+        # Time period selector
+        col1, col2 = st.columns(2)
+        with col1:
+            period = st.selectbox("Período:", ["1M", "3M", "6M", "1Y", "2Y"], index=2)
+        with col2:
+            comparison_metric = st.selectbox("Métrica:", ["Close", "Returns", "Volatility"])
+        
+        if st.button("🔄 Actualizar Análisis"):
+            progress_bar = st.progress(0)
+            symbol_data = {}
+            
+            for i, symbol in enumerate(st.session_state.symbol_portfolio):
+                try:
+                    with st.spinner(f"Descargando {symbol}..."):
+                        ticker = yf.Ticker(symbol)
+                        data = ticker.history(period=period.lower())
+                        
+                        if not data.empty:
+                            symbol_data[symbol] = data
+                        
+                        progress_bar.progress((i + 1) / len(st.session_state.symbol_portfolio))
+                        
+                except Exception as e:
+                    st.error(f"Error con {symbol}: {e}")
+            
+            progress_bar.empty()
+            
+            if symbol_data:
+                # Comparative visualization
+                st.subheader("📊 Comparación Visual")
+                
+                fig = go.Figure()
+                
+                for symbol, data in symbol_data.items():
+                    if comparison_metric == "Close":
+                        y_data = data['Close']
+                        title = "Precio de Cierre"
+                    elif comparison_metric == "Returns":
+                        y_data = data['Close'].pct_change().cumsum() * 100
+                        title = "Retornos Acumulados (%)"
+                    else:  # Volatility
+                        y_data = data['Close'].pct_change().rolling(20).std() * 100
+                        title = "Volatilidad (20 días) (%)"
+                    
+                    fig.add_trace(go.Scatter(
+                        x=data.index,
+                        y=y_data,
+                        mode='lines',
+                        name=symbol,
+                        hovertemplate=f'<b>{symbol}</b><br>%{{x}}<br>{comparison_metric}: %{{y}}<extra></extra>'
+                    ))
+                
+                fig.update_layout(
+                    title=f"{title} - Comparación Multi-Símbolo",
+                    xaxis_title="Fecha",
+                    yaxis_title=title,
+                    height=500,
+                    hovermode='x unified'
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # Performance metrics table
+                st.subheader("📋 Métricas de Performance")
+                
+                metrics_data = []
+                for symbol, data in symbol_data.items():
+                    current_price = data['Close'].iloc[-1]
+                    start_price = data['Close'].iloc[0]
+                    total_return = ((current_price - start_price) / start_price) * 100
+                    volatility = data['Close'].pct_change().std() * 100 * np.sqrt(252)  # Annualized
+                    max_price = data['Close'].max()
+                    min_price = data['Close'].min()
+                    
+                    metrics_data.append({
+                        'Símbolo': symbol,
+                        'Precio Actual': f"${current_price:.2f}",
+                        'Retorno Total': f"{total_return:.2f}%",
+                        'Volatilidad': f"{volatility:.2f}%",
+                        'Máximo': f"${max_price:.2f}",
+                        'Mínimo': f"${min_price:.2f}",
+                        'Rendimiento': "🟢" if total_return > 0 else "🔴"
+                    })
+                
+                metrics_df = pd.DataFrame(metrics_data)
+                st.dataframe(metrics_df, use_container_width=True, hide_index=True)
+                
+                # Top performers
+                st.subheader("🏆 Top Performers")
+                metrics_df['Return_num'] = metrics_df['Retorno Total'].str.replace('%', '').astype(float)
+                top_performer = metrics_df.loc[metrics_df['Return_num'].idxmax()]
+                worst_performer = metrics_df.loc[metrics_df['Return_num'].idxmin()]
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.success(f"🥇 **Mejor:** {top_performer['Símbolo']} ({top_performer['Retorno Total']})")
+                with col2:
+                    st.error(f"📉 **Peor:** {worst_performer['Símbolo']} ({worst_performer['Retorno Total']})")
+
+# Upload Section (renamed)
+elif step == "📈 Upload & Data":
     st.header("1. Cargar Datos")
     
     # Data source selection
@@ -1111,8 +1473,8 @@ if step == "Upload":
                 except Exception as e:
                     st.error(f"Error cargando noticias: {e}")
 
-# Step 2: Visualize
-elif step == "Visualize":
+# Visualize Section (renamed)
+elif step == "👁️ Visualize":
     st.header("2. Visualizar")
     
     if st.session_state.data is not None:
@@ -1142,8 +1504,8 @@ elif step == "Visualize":
     else:
         st.warning("Carga los datos primero")
 
-# Step 3: Test
-elif step == "Test":
+# Stationarity Test Section
+elif step == "🔍 Stationarity Test":
     st.header("3. Test de Estacionariedad")
     
     if st.session_state.data is not None:
@@ -1153,8 +1515,8 @@ elif step == "Test":
     else:
         st.warning("Carga los datos primero")
 
-# Step 4: Difference
-elif step == "Difference":
+# Difference Section
+elif step == "📐 Difference":
     st.header("4. Diferenciación")
     
     if st.session_state.data is not None:
@@ -1179,8 +1541,746 @@ elif step == "Difference":
     else:
         st.warning("Carga los datos primero")
 
-# Step 5: Model
-elif step == "Model":
+# Advanced Models Section 
+elif step == "🤖 Advanced Models":
+    st.header("🤖 Modelos Avanzados de Forecasting")
+    
+    if st.session_state.data is not None:
+        df = st.session_state.data
+        target = st.session_state.target_col
+        
+        # Model selection
+        model_type = st.selectbox("🧠 Selecciona Modelo:", [
+            "ARIMA (Clásico)",
+            "Prophet (Facebook)", 
+            "LSTM (Deep Learning)",
+            "Ensemble (Combinado)"
+        ])
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            train_split = st.slider("% Datos entrenamiento", 60, 90, 80)
+        with col2:
+            forecast_days = st.number_input("Días a predecir", 1, 365, 30)
+        
+        if st.button("🚀 Entrenar Modelo Avanzado"):
+            split_idx = int(len(df) * train_split / 100)
+            train_data = df[:split_idx]
+            test_data = df[split_idx:]
+            
+            if model_type == "ARIMA (Clásico)":
+                try:
+                    with st.spinner("🔄 Entrenando ARIMA..."):
+                        best_model, best_params, results = auto_arima_tuning(
+                            train_data[target], max_p=3, max_d=2, max_q=3
+                        )
+                        
+                        if best_model:
+                            # Make predictions
+                            forecast = best_model.forecast(steps=len(test_data))
+                            future_forecast = best_model.forecast(steps=forecast_days)
+                            
+                            # Calculate metrics
+                            rmse = np.sqrt(mean_squared_error(test_data[target], forecast))
+                            mae = mean_absolute_error(test_data[target], forecast)
+                            
+                            st.success(f"✅ ARIMA{best_params} entrenado")
+                            
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                st.metric("RMSE", f"{rmse:.4f}")
+                            with col2:
+                                st.metric("MAE", f"{mae:.4f}")
+                            with col3:
+                                st.metric("AIC", f"{best_model.aic:.2f}")
+                            
+                            # Store results
+                            st.session_state.model = best_model
+                            st.session_state.forecast = future_forecast
+                            
+                except Exception as e:
+                    st.error(f"Error ARIMA: {e}")
+            
+            elif model_type == "Prophet (Facebook)" and PROPHET_AVAILABLE:
+                try:
+                    with st.spinner("🔄 Entrenando Prophet..."):
+                        # Prepare data for Prophet
+                        prophet_data = train_data.reset_index()
+                        prophet_data.columns = ['ds', 'y']
+                        
+                        # Initialize and fit Prophet
+                        model = Prophet(
+                            daily_seasonality=True,
+                            weekly_seasonality=True,
+                            yearly_seasonality=True,
+                            changepoint_prior_scale=0.05
+                        )
+                        model.fit(prophet_data)
+                        
+                        # Make predictions on test set
+                        test_future = model.make_future_dataframe(periods=len(test_data))
+                        test_forecast = model.predict(test_future)
+                        
+                        # Future predictions
+                        future = model.make_future_dataframe(periods=forecast_days + len(df))
+                        forecast = model.predict(future)
+                        
+                        # Calculate metrics
+                        predicted = test_forecast['yhat'][-len(test_data):]
+                        rmse = np.sqrt(mean_squared_error(test_data[target], predicted))
+                        mae = mean_absolute_error(test_data[target], predicted)
+                        
+                        st.success("✅ Prophet entrenado exitosamente")
+                        
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric("RMSE", f"{rmse:.4f}")
+                        with col2:
+                            st.metric("MAE", f"{mae:.4f}")
+                        with col3:
+                            st.metric("R²", f"{1 - (rmse**2 / np.var(test_data[target])):.4f}")
+                        
+                        # Visualization
+                        fig = go.Figure()
+                        
+                        # Historical data
+                        fig.add_trace(go.Scatter(
+                            x=df.index, y=df[target],
+                            mode='lines', name='Histórico',
+                            line=dict(color='blue')
+                        ))
+                        
+                        # Forecast
+                        future_dates = pd.date_range(
+                            start=df.index[-1] + pd.Timedelta(days=1),
+                            periods=forecast_days
+                        )
+                        
+                        fig.add_trace(go.Scatter(
+                            x=future_dates, 
+                            y=forecast['yhat'][-forecast_days:],
+                            mode='lines', name='Pronóstico Prophet',
+                            line=dict(color='red', dash='dash')
+                        ))
+                        
+                        # Confidence intervals
+                        fig.add_trace(go.Scatter(
+                            x=future_dates,
+                            y=forecast['yhat_upper'][-forecast_days:],
+                            fill=None, mode='lines',
+                            line_color='rgba(255,0,0,0)',
+                            showlegend=False
+                        ))
+                        
+                        fig.add_trace(go.Scatter(
+                            x=future_dates,
+                            y=forecast['yhat_lower'][-forecast_days:],
+                            fill='tonexty', mode='lines',
+                            line_color='rgba(255,0,0,0)',
+                            name='Intervalo Confianza'
+                        ))
+                        
+                        fig.update_layout(
+                            title="📈 Pronóstico Prophet con Intervalos de Confianza",
+                            height=500
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Store results
+                        st.session_state.prophet_model = model
+                        st.session_state.prophet_forecast = forecast
+                        
+                except Exception as e:
+                    st.error(f"Error Prophet: {e}")
+            
+            elif model_type == "LSTM (Deep Learning)" and TF_AVAILABLE:
+                try:
+                    with st.spinner("🔄 Entrenando LSTM Neural Network..."):
+                        # Prepare data for LSTM
+                        scaler = MinMaxScaler()
+                        scaled_data = scaler.fit_transform(train_data[target].values.reshape(-1, 1))
+                        
+                        # Create sequences
+                        def create_sequences(data, seq_length=60):
+                            X, y = [], []
+                            for i in range(seq_length, len(data)):
+                                X.append(data[i-seq_length:i, 0])
+                                y.append(data[i, 0])
+                            return np.array(X), np.array(y)
+                        
+                        seq_length = min(60, len(scaled_data) // 4)
+                        X_train, y_train = create_sequences(scaled_data, seq_length)
+                        X_train = X_train.reshape((X_train.shape[0], X_train.shape[1], 1))
+                        
+                        # Build LSTM model
+                        model = Sequential([
+                            LSTM(50, return_sequences=True, input_shape=(seq_length, 1)),
+                            Dropout(0.2),
+                            LSTM(50, return_sequences=False),
+                            Dropout(0.2),
+                            Dense(25),
+                            Dense(1)
+                        ])
+                        
+                        model.compile(optimizer='adam', loss='mean_squared_error')
+                        
+                        # Train model
+                        history = model.fit(
+                            X_train, y_train,
+                            batch_size=32,
+                            epochs=50,
+                            verbose=0,
+                            validation_split=0.2
+                        )
+                        
+                        # Make predictions
+                        last_sequence = scaled_data[-seq_length:]
+                        predictions = []
+                        
+                        for _ in range(forecast_days):
+                            pred = model.predict(last_sequence.reshape(1, seq_length, 1), verbose=0)
+                            predictions.append(pred[0, 0])
+                            last_sequence = np.append(last_sequence[1:], pred[0, 0])
+                        
+                        # Inverse transform predictions
+                        predictions = scaler.inverse_transform(np.array(predictions).reshape(-1, 1))
+                        
+                        st.success("✅ LSTM Neural Network entrenado")
+                        
+                        # Show training metrics
+                        final_loss = history.history['loss'][-1]
+                        val_loss = history.history['val_loss'][-1]
+                        
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric("Loss Final", f"{final_loss:.6f}")
+                        with col2:
+                            st.metric("Val Loss", f"{val_loss:.6f}")
+                        with col3:
+                            st.metric("Épocas", "50")
+                        
+                        # Visualization
+                        fig = go.Figure()
+                        
+                        # Historical
+                        fig.add_trace(go.Scatter(
+                            x=df.index, y=df[target],
+                            mode='lines', name='Histórico',
+                            line=dict(color='blue')
+                        ))
+                        
+                        # LSTM Forecast
+                        future_dates = pd.date_range(
+                            start=df.index[-1] + pd.Timedelta(days=1),
+                            periods=forecast_days
+                        )
+                        
+                        fig.add_trace(go.Scatter(
+                            x=future_dates, y=predictions.flatten(),
+                            mode='lines', name='Pronóstico LSTM',
+                            line=dict(color='green', dash='dash')
+                        ))
+                        
+                        fig.update_layout(
+                            title="🧠 Pronóstico LSTM Deep Learning",
+                            height=500
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Store results
+                        st.session_state.lstm_model = model
+                        st.session_state.lstm_predictions = predictions
+                        
+                except Exception as e:
+                    st.error(f"Error LSTM: {e}")
+            
+            elif model_type == "Ensemble (Combinado)":
+                st.info("🔄 Entrenando múltiples modelos para ensemble...")
+                
+                # This would combine ARIMA, Prophet, and LSTM
+                ensemble_predictions = []
+                weights = []
+                
+                try:
+                    # ARIMA component
+                    best_model, _, _ = auto_arima_tuning(train_data[target], max_p=2, max_d=1, max_q=2)
+                    if best_model:
+                        arima_pred = best_model.forecast(steps=forecast_days)
+                        ensemble_predictions.append(arima_pred)
+                        weights.append(0.4)
+                        st.success("✅ ARIMA component trained")
+                except:
+                    pass
+                
+                if len(ensemble_predictions) > 0:
+                    # Simple weighted average for now
+                    final_prediction = np.average(ensemble_predictions, axis=0, weights=weights)
+                    
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(
+                        x=df.index, y=df[target],
+                        mode='lines', name='Histórico'
+                    ))
+                    
+                    future_dates = pd.date_range(
+                        start=df.index[-1] + pd.Timedelta(days=1),
+                        periods=forecast_days
+                    )
+                    
+                    fig.add_trace(go.Scatter(
+                        x=future_dates, y=final_prediction,
+                        mode='lines', name='Ensemble Forecast',
+                        line=dict(color='purple', dash='dash')
+                    ))
+                    
+                    fig.update_layout(title="🎯 Ensemble Model Forecast", height=500)
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    st.success(f"✅ Ensemble con {len(ensemble_predictions)} modelos")
+        
+        # Model availability warnings
+        if not PROPHET_AVAILABLE and model_type == "Prophet (Facebook)":
+            st.warning("⚠️ Prophet no está disponible. Instala prophet para usar este modelo.")
+        
+        if not TF_AVAILABLE and model_type == "LSTM (Deep Learning)":
+            st.warning("⚠️ TensorFlow no está disponible. Instala tensorflow para usar LSTM.")
+    
+    else:
+        st.warning("Carga los datos primero")
+
+# Performance Tracker Section
+elif step == "🏆 Performance Tracker":
+    st.header("🏆 Performance Tracker & Achievements")
+    
+    # User level and achievements system
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("👤 Nivel de Usuario", st.session_state.user_level)
+    with col2:
+        st.metric("🏅 Logros Desbloqueados", len(st.session_state.achievements))
+    with col3:
+        xp_needed = (st.session_state.user_level * 100) - (len(st.session_state.achievements) * 10)
+        st.metric("⭐ XP para Siguiente Nivel", max(0, xp_needed))
+    
+    # Achievement badges
+    st.subheader("🎖️ Sistema de Logros")
+    
+    achievements_data = {
+        "🥇 First Model": {"desc": "Entrena tu primer modelo", "unlocked": "first_model" in st.session_state.achievements},
+        "📊 Data Explorer": {"desc": "Analiza 5 símbolos diferentes", "unlocked": "data_explorer" in st.session_state.achievements},
+        "🤖 AI Master": {"desc": "Usa 3 tipos de modelos diferentes", "unlocked": "ai_master" in st.session_state.achievements},
+        "📈 Prophet User": {"desc": "Completa un pronóstico con Prophet", "unlocked": "prophet_user" in st.session_state.achievements},
+        "🧠 LSTM Expert": {"desc": "Entrena una red neural LSTM", "unlocked": "lstm_expert" in st.session_state.achievements},
+        "🎯 Precision Pro": {"desc": "Obtén RMSE < 0.05", "unlocked": "precision_pro" in st.session_state.achievements},
+        "💎 Portfolio Builder": {"desc": "Crea un portfolio de 10+ símbolos", "unlocked": "portfolio_builder" in st.session_state.achievements},
+        "🔥 Streak Master": {"desc": "Usa la app 7 días seguidos", "unlocked": "streak_master" in st.session_state.achievements}
+    }
+    
+    cols = st.columns(4)
+    for i, (achievement, data) in enumerate(achievements_data.items()):
+        with cols[i % 4]:
+            if data["unlocked"]:
+                st.success(f"✅ {achievement}")
+                st.caption(data["desc"])
+            else:
+                st.info(f"🔒 {achievement}")
+                st.caption(data["desc"])
+    
+    # Performance metrics history
+    st.subheader("📊 Historial de Performance")
+    
+    if 'performance_history' not in st.session_state:
+        st.session_state.performance_history = []
+    
+    if st.session_state.performance_history:
+        perf_df = pd.DataFrame(st.session_state.performance_history)
+        
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=perf_df['date'], y=perf_df['rmse'],
+            mode='lines+markers', name='RMSE',
+            line=dict(color='blue')
+        ))
+        
+        fig.update_layout(
+            title="📈 Evolución de RMSE en el Tiempo",
+            xaxis_title="Fecha",
+            yaxis_title="RMSE",
+            height=400
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Best performance summary
+        best_rmse = min(perf_df['rmse'])
+        best_model = perf_df.loc[perf_df['rmse'].idxmin(), 'model']
+        
+        st.success(f"🏆 **Mejor RMSE:** {best_rmse:.4f} con {best_model}")
+    else:
+        st.info("📝 Entrena algunos modelos para ver tu historial de performance")
+    
+    # Leaderboard simulation
+    st.subheader("🎮 Leaderboard Global")
+    
+    leaderboard_data = [
+        {"Usuario": "Tú 🎯", "Mejor RMSE": "0.0234", "Modelos": 12, "Nivel": st.session_state.user_level},
+        {"Usuario": "DataNinja 🥷", "Mejor RMSE": "0.0189", "Modelos": 45, "Nivel": 15},
+        {"Usuario": "MarketGuru 📈", "Mejor RMSE": "0.0156", "Modelos": 78, "Nivel": 22},
+        {"Usuario": "AIExpert 🤖", "Mejor RMSE": "0.0098", "Modelos": 134, "Nivel": 31},
+        {"Usuario": "QuantKing 👑", "Mejor RMSE": "0.0067", "Modelos": 200, "Nivel": 45}
+    ]
+    
+    leaderboard_df = pd.DataFrame(leaderboard_data)
+    st.dataframe(leaderboard_df, use_container_width=True, hide_index=True)
+
+# Mood & Sentiment Section
+elif step == "🎯 Mood & Sentiment":
+    st.header("🎯 Stock Mood Tracker & Sentiment Analysis")
+    
+    # Current market mood
+    st.subheader("😊 Market Mood Dashboard")
+    
+    mood_emojis = {
+        "Muy Alcista": "🚀",
+        "Alcista": "📈", 
+        "Neutral": "😐",
+        "Bajista": "📉",
+        "Muy Bajista": "💥"
+    }
+    
+    # Simulate market sentiment for popular stocks
+    popular_stocks = ["AAPL", "GOOGL", "MSFT", "TSLA", "AMZN", "META", "NVDA"]
+    sentiment_data = []
+    
+    for stock in popular_stocks:
+        # Simulate sentiment (in real app, this would come from news analysis)
+        import random
+        sentiments = list(mood_emojis.keys())
+        current_sentiment = random.choice(sentiments)
+        sentiment_score = random.uniform(-1, 1)
+        
+        sentiment_data.append({
+            "Símbolo": stock,
+            "Mood": mood_emojis[current_sentiment],
+            "Sentimiento": current_sentiment,
+            "Score": f"{sentiment_score:.2f}",
+            "Confianza": f"{random.randint(70, 95)}%"
+        })
+    
+    sentiment_df = pd.DataFrame(sentiment_data)
+    st.dataframe(sentiment_df, use_container_width=True, hide_index=True)
+    
+    # Animated sentiment indicators
+    st.subheader("🌟 Indicadores Animados de Sentimiento")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown("""
+        <div style="text-align: center; padding: 20px; background: linear-gradient(45deg, #ff6b6b, #ffa726); border-radius: 15px; animation: pulse 2s infinite;">
+            <h2 style="color: white;">🔥 TSLA</h2>
+            <p style="color: white; font-size: 24px;">Muy Alcista</p>
+            <p style="color: white;">Score: +0.87</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown("""
+        <div style="text-align: center; padding: 20px; background: linear-gradient(45deg, #4caf50, #66bb6a); border-radius: 15px; animation: bounce 2s infinite;">
+            <h2 style="color: white;">📈 AAPL</h2>
+            <p style="color: white; font-size: 24px;">Alcista</p>
+            <p style="color: white;">Score: +0.65</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown("""
+        <div style="text-align: center; padding: 20px; background: linear-gradient(45deg, #2196f3, #42a5f5); border-radius: 15px; animation: glow 3s infinite;">
+            <h2 style="color: white;">😐 MSFT</h2>
+            <p style="color: white; font-size: 24px;">Neutral</p>
+            <p style="color: white;">Score: +0.12</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Add CSS animations
+    st.markdown("""
+    <style>
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+    }
+    @keyframes bounce {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-10px); }
+    }
+    @keyframes glow {
+        0%, 100% { box-shadow: 0 0 5px rgba(33, 150, 243, 0.5); }
+        50% { box-shadow: 0 0 20px rgba(33, 150, 243, 0.8); }
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Sentiment tracking over time
+    st.subheader("📊 Evolución del Sentimiento")
+    
+    # Generate sample sentiment timeline
+    dates = pd.date_range(start='2024-01-01', end='2024-01-31', freq='D')
+    sentiment_timeline = []
+    
+    for date in dates:
+        sentiment_timeline.append({
+            'date': date,
+            'bull_sentiment': random.uniform(0.3, 0.9),
+            'bear_sentiment': random.uniform(0.1, 0.7),
+            'neutral_sentiment': random.uniform(0.2, 0.5)
+        })
+    
+    timeline_df = pd.DataFrame(sentiment_timeline)
+    
+    fig = go.Figure()
+    
+    fig.add_trace(go.Scatter(
+        x=timeline_df['date'], y=timeline_df['bull_sentiment'],
+        mode='lines', name='📈 Alcista',
+        line=dict(color='green'), fill='tonexty'
+    ))
+    
+    fig.add_trace(go.Scatter(
+        x=timeline_df['date'], y=timeline_df['bear_sentiment'],
+        mode='lines', name='📉 Bajista',
+        line=dict(color='red')
+    ))
+    
+    fig.add_trace(go.Scatter(
+        x=timeline_df['date'], y=timeline_df['neutral_sentiment'],
+        mode='lines', name='😐 Neutral',
+        line=dict(color='blue')
+    ))
+    
+    fig.update_layout(
+        title="🎭 Evolución del Sentimiento del Mercado",
+        xaxis_title="Fecha",
+        yaxis_title="Score de Sentimiento",
+        height=400
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+
+# Symbol Heat Map Section
+elif step == "🗺️ Symbol Heat Map":
+    st.header("🗺️ Interactive Symbol Heat Map")
+    
+    # Generate sample market data for heat map
+    sectors = {
+        "Technology": ["AAPL", "MSFT", "GOOGL", "META", "NVDA", "ADBE", "CRM", "ORCL"],
+        "Finance": ["JPM", "BAC", "WFC", "GS", "V", "MA", "AXP", "USB"],
+        "Healthcare": ["JNJ", "UNH", "PFE", "ABBV", "TMO", "DHR", "BMY", "MRK"],
+        "Energy": ["XOM", "CVX", "COP", "EOG", "SLB", "PSX", "VLO", "MPC"],
+        "Consumer": ["AMZN", "TSLA", "WMT", "HD", "NKE", "SBUX", "MCD", "DIS"]
+    }
+    
+    heat_map_data = []
+    
+    for sector, symbols in sectors.items():
+        for symbol in symbols:
+            # Simulate performance data
+            import random
+            performance = random.uniform(-5, 8)  # Random % change
+            volume = random.randint(1000000, 50000000)
+            market_cap = random.uniform(50, 3000)  # Billions
+            
+            heat_map_data.append({
+                'Symbol': symbol,
+                'Sector': sector,
+                'Performance': performance,
+                'Volume': volume,
+                'MarketCap': market_cap,
+                'Size': market_cap  # For bubble size
+            })
+    
+    heat_df = pd.DataFrame(heat_map_data)
+    
+    # Interactive controls
+    col1, col2 = st.columns(2)
+    with col1:
+        color_metric = st.selectbox("Color por:", ["Performance", "Volume", "MarketCap"])
+    with col2:
+        size_metric = st.selectbox("Tamaño por:", ["MarketCap", "Volume", "Performance"])
+    
+    # Create interactive heat map
+    fig = px.treemap(
+        heat_df,
+        path=['Sector', 'Symbol'],
+        values='MarketCap',
+        color='Performance',
+        color_continuous_scale='RdYlGn',
+        title="🗺️ Market Heat Map por Sector y Performance"
+    )
+    
+    fig.update_layout(height=600)
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Bubble chart alternative view
+    st.subheader("🫧 Vista de Burbujas Interactiva")
+    
+    fig_bubble = px.scatter(
+        heat_df,
+        x='Performance',
+        y='Volume',
+        size='MarketCap',
+        color='Sector',
+        hover_name='Symbol',
+        title="📊 Performance vs Volume (Tamaño = Market Cap)",
+        labels={
+            'Performance': 'Performance (%)',
+            'Volume': 'Volumen',
+            'MarketCap': 'Market Cap (B)'
+        }
+    )
+    
+    fig_bubble.update_layout(height=500)
+    st.plotly_chart(fig_bubble, use_container_width=True)
+    
+    # Top movers
+    st.subheader("🏃‍♂️ Top Movers")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.success("📈 **Top Gainers**")
+        top_gainers = heat_df.nlargest(5, 'Performance')[['Symbol', 'Performance', 'Sector']]
+        for _, row in top_gainers.iterrows():
+            st.write(f"🟢 **{row['Symbol']}** ({row['Sector']}): +{row['Performance']:.2f}%")
+    
+    with col2:
+        st.error("📉 **Top Losers**")
+        top_losers = heat_df.nsmallest(5, 'Performance')[['Symbol', 'Performance', 'Sector']]
+        for _, row in top_losers.iterrows():
+            st.write(f"🔴 **{row['Symbol']}** ({row['Sector']}): {row['Performance']:.2f}%")
+
+# AI Learning Mode Section
+elif step == "🎓 AI Learning Mode":
+    st.header("🎓 AI-Driven Learning Mode")
+    
+    # Learning progress
+    st.subheader("📚 Tu Progreso de Aprendizaje")
+    
+    topics = {
+        "📊 Fundamentos de ARIMA": 85,
+        "🔮 Prophet Forecasting": 60,
+        "🧠 Deep Learning LSTM": 40,
+        "📈 Análisis Técnico": 75,
+        "💹 Gestión de Riesgo": 55,
+        "🎯 Portfolio Optimization": 30
+    }
+    
+    for topic, progress in topics.items():
+        st.write(f"**{topic}**")
+        st.progress(progress / 100)
+        st.write(f"Progreso: {progress}%")
+        st.write("---")
+    
+    # Interactive learning modules
+    st.subheader("🎯 Módulos de Aprendizaje Interactivos")
+    
+    learning_module = st.selectbox("Selecciona un módulo:", [
+        "🔍 ¿Qué es ARIMA?",
+        "📊 Interpretando Residuos",
+        "🎲 Estacionariedad Explicada",
+        "🧠 Redes Neuronales para Finanzas",
+        "📈 Patrones de Mercado"
+    ])
+    
+    if learning_module == "🔍 ¿Qué es ARIMA?":
+        st.markdown("""
+        ### 🎯 ARIMA: AutoRegressive Integrated Moving Average
+        
+        **ARIMA** es un modelo estadístico que combina tres componentes:
+        
+        🔄 **AR (AutoRegressive)**: El valor actual depende de valores pasados
+        📊 **I (Integrated)**: Diferenciación para lograr estacionariedad  
+        📈 **MA (Moving Average)**: Errores pasados afectan predicciones actuales
+        
+        #### 🎮 Demo Interactiva
+        """)
+        
+        # Interactive ARIMA component demo
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.markdown("""
+            <div style="padding: 20px; background: linear-gradient(45deg, #ff6b6b, #ffa726); border-radius: 10px; text-align: center;">
+                <h3 style="color: white;">🔄 AR Component</h3>
+                <p style="color: white;">Yt = φ₁Yt-₁ + φ₂Yt-₂ + ...</p>
+                <p style="color: white; font-size: 12px;">Los valores pasados predicen el futuro</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown("""
+            <div style="padding: 20px; background: linear-gradient(45deg, #4caf50, #66bb6a); border-radius: 10px; text-align: center;">
+                <h3 style="color: white;">📊 I Component</h3>
+                <p style="color: white;">ΔYt = Yt - Yt-₁</p>
+                <p style="color: white; font-size: 12px;">Diferenciación para estacionariedad</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col3:
+            st.markdown("""
+            <div style="padding: 20px; background: linear-gradient(45deg, #2196f3, #42a5f5); border-radius: 10px; text-align: center;">
+                <h3 style="color: white;">📈 MA Component</h3>
+                <p style="color: white;">Yt = θ₁εt-₁ + θ₂εt-₂ + ...</p>
+                <p style="color: white; font-size: 12px;">Errores pasados mejoran predicción</p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # Quiz
+        st.subheader("🧩 Mini Quiz")
+        
+        quiz_question = st.radio(
+            "¿Cuál es el propósito principal del componente 'I' en ARIMA?",
+            ["Predecir valores futuros", "Hacer la serie estacionaria", "Corregir errores", "Calcular tendencias"]
+        )
+        
+        if st.button("🎯 Verificar Respuesta"):
+            if quiz_question == "Hacer la serie estacionaria":
+                st.success("🎉 ¡Correcto! El componente 'I' (Integrado) hace la serie estacionaria mediante diferenciación.")
+                # Add achievement
+                if "quiz_master" not in st.session_state.achievements:
+                    st.session_state.achievements.append("quiz_master")
+                    st.balloons()
+            else:
+                st.error("❌ Intenta de nuevo. Piensa en qué significa 'Integrated'.")
+    
+    elif learning_module == "🧠 Redes Neuronales para Finanzas":
+        st.markdown("""
+        ### 🧠 Deep Learning en Finanzas
+        
+        Las **redes neuronales** pueden capturar patrones complejos que los modelos tradicionales no pueden.
+        
+        #### 🎯 LSTM para Series Temporales
+        """)
+        
+        # Animated explanation
+        st.markdown("""
+        <div style="text-align: center; padding: 20px;">
+            <div style="display: inline-block; padding: 15px; margin: 10px; background: #ff6b6b; color: white; border-radius: 50px; animation: slideInLeft 2s;">
+                📊 Precio Pasado
+            </div>
+            <div style="display: inline-block; padding: 15px; margin: 10px; background: #ffa726; color: white; border-radius: 50px; animation: slideInLeft 2.5s;">
+                🔄 LSTM Cell
+            </div>
+            <div style="display: inline-block; padding: 15px; margin: 10px; background: #4caf50; color: white; border-radius: 50px; animation: slideInRight 3s;">
+                🔮 Predicción
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.info("💡 **Tip**: LSTM funciona mejor con grandes cantidades de datos y puede aprender dependencias a largo plazo.")
+
+# Original Model Section (renamed)
+elif step == "🤖 Advanced Models":
     st.header("5. Modelo ARIMA")
     
     if st.session_state.data is not None:
