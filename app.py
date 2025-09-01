@@ -63,8 +63,11 @@ def perform_adf_test(data, title="ADF Test Results"):
             
         with col2:
             st.write("**Critical Values:**")
-            for key, val in dftest[4].items():
-                st.write(f"• {key}: {val:.6f}")
+            if len(dftest) > 4 and isinstance(dftest[4], dict):
+                for key, val in dftest[4].items():
+                    st.write(f"• {key}: {val:.6f}")
+            else:
+                st.write("• Critical values not available")
         
         # Interpretation
         if dftest[1] <= 0.05:
@@ -521,7 +524,7 @@ elif selected_step == "📊 ACF/PACF Analysis":
 elif selected_step == "🤖 ARIMA Model Building":
     st.header("🤖 ARIMA Model Building")
     
-    if st.session_state.df_diff is not None:
+    if st.session_state.df_diff is not None and st.session_state.data is not None:
         df_diff = st.session_state.df_diff
         original_data = st.session_state.data[st.session_state.target_column]
         
@@ -673,7 +676,7 @@ elif selected_step == "🤖 ARIMA Model Building":
 elif selected_step == "🎯 Predictions & Results":
     st.header("🎯 Predictions & Results")
     
-    if st.session_state.arima_model is not None:
+    if st.session_state.arima_model is not None and st.session_state.data is not None:
         model_fit = st.session_state.arima_model
         original_data = st.session_state.data[st.session_state.target_column]
         params = st.session_state.arima_params
@@ -729,6 +732,7 @@ elif selected_step == "🎯 Predictions & Results":
                     ))
                     
                     # Confidence intervals (if available)
+                    forecast_ci = None
                     try:
                         forecast_ci = model_fit.get_forecast(steps=forecast_steps, alpha=1-confidence_level/100).conf_int()
                         
@@ -772,8 +776,9 @@ elif selected_step == "🎯 Predictions & Results":
                     })
                     
                     try:
-                        forecast_df['Lower_CI'] = forecast_ci.iloc[:, 0].values
-                        forecast_df['Upper_CI'] = forecast_ci.iloc[:, 1].values
+                        if 'forecast_ci' in locals() and forecast_ci is not None:
+                            forecast_df['Lower_CI'] = forecast_ci.iloc[:, 0].values
+                            forecast_df['Upper_CI'] = forecast_ci.iloc[:, 1].values
                     except:
                         pass
                     
