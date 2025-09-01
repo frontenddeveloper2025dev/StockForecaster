@@ -484,7 +484,8 @@ if step == "Upload":
             "UK Stocks": ["BP", "SHELL", "VODAFONE", "HSBA", "LLOY"],
             "European": ["SAP", "ASML", "NESN", "RMS"],
             "ETFs": ["SPY", "QQQ", "VTI", "IWM"],
-            "Crypto": ["BTCUSD", "ETHUSD", "ADAUSD"]
+            "Forex": ["GBPUSD", "EURUSD", "USDJPY", "USDCHF", "AUDUSD", "USDCAD"],
+            "Crypto": ["BTCUSD", "ETHUSD", "ADAUSD", "LTCUSD", "XRPUSD"]
         }
         
         selected_market = st.selectbox("Categoría:", list(finage_markets.keys()))
@@ -513,17 +514,16 @@ if step == "Upload":
                     start_str = start_date.strftime("%Y-%m-%d")
                     end_str = end_date.strftime("%Y-%m-%d")
                     
-                    # Finage historical API endpoint
-                    if symbol.endswith("USD"):  # Crypto
-                        url = f"https://api.finage.co.uk/history/crypto/{symbol}"
+                    # Finage aggregated API endpoint
+                    if symbol in ["BTCUSD", "ETHUSD", "ADAUSD", "LTCUSD", "XRPUSD"]:  # Crypto
+                        url = f"https://api.finage.co.uk/agg/crypto/{symbol.lower()}/1/day/{start_str}/{end_str}"
+                    elif symbol in ["GBPUSD", "EURUSD", "USDJPY", "USDCHF", "AUDUSD", "USDCAD"]:  # Forex
+                        url = f"https://api.finage.co.uk/agg/forex/{symbol.lower()}/1/day/{start_str}/{end_str}"
                     else:  # Stocks
-                        url = f"https://api.finage.co.uk/history/stock/{symbol}"
+                        url = f"https://api.finage.co.uk/agg/stock/{symbol.lower()}/1/day/{start_str}/{end_str}"
                     
                     params = {
-                        'apikey': api_key,
-                        'period': '1d',  # Daily data
-                        'from': start_str,
-                        'to': end_str
+                        'apikey': api_key
                     }
                     
                     # Make API request
@@ -533,16 +533,25 @@ if step == "Upload":
                         json_data = response.json()
                         
                         if 'results' in json_data and json_data['results']:
-                            # Convert to DataFrame
+                            # Convert to DataFrame for aggregated endpoint
                             df_data = []
                             for item in json_data['results']:
+                                # Handle both timestamp formats
+                                if 't' in item:
+                                    date = pd.to_datetime(item['t'], unit='ms')
+                                elif 'timestamp' in item:
+                                    date = pd.to_datetime(item['timestamp'], unit='ms')  
+                                else:
+                                    # Fallback for date string format
+                                    date = pd.to_datetime(item.get('date', item.get('T')))
+                                
                                 df_data.append({
-                                    'date': pd.to_datetime(item['t'], unit='ms'),
-                                    'open': item['o'],
-                                    'high': item['h'],
-                                    'low': item['l'],
-                                    'close': item['c'],
-                                    'volume': item.get('v', 0)  # Volume might not be available for all symbols
+                                    'date': date,
+                                    'open': item.get('o', item.get('open')),
+                                    'high': item.get('h', item.get('high')),
+                                    'low': item.get('l', item.get('low')),
+                                    'close': item.get('c', item.get('close')),
+                                    'volume': item.get('v', item.get('volume', 0))
                                 })
                             
                             data = pd.DataFrame(df_data)
