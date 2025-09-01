@@ -9,6 +9,7 @@ import yfinance as yf
 from alpha_vantage.timeseries import TimeSeries
 from datetime import datetime, timedelta
 import os
+import requests
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -51,49 +52,88 @@ def adf_test(data):
         st.error(f"Error en test: {e}")
         return False
 
-def auto_arima_tuning(data, max_p=3, max_d=2, max_q=3):
-    """Automatic ARIMA hyperparameter tuning using grid search"""
+def auto_arima_tuning(data, max_p=5, max_d=2, max_q=5, use_stepwise=False):
+    """Enhanced ARIMA hyperparameter tuning with advanced grid search"""
     best_aic = float('inf')
+    best_bic = float('inf')
     best_params = None
     best_model = None
     results = []
     
+    # Progress tracking
     progress_bar = st.progress(0)
     status_text = st.empty()
+    metrics_container = st.container()
     
     total_combinations = (max_p + 1) * (max_d + 1) * (max_q + 1)
     current_combination = 0
+    successful_fits = 0
     
+    # Live metrics display
+    with metrics_container:
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            tested_metric = st.empty()
+        with col2:
+            successful_metric = st.empty()
+        with col3:
+            best_aic_metric = st.empty()
+    
+    # Grid search with enhanced tracking
     for p in range(max_p + 1):
         for d in range(max_d + 1):
             for q in range(max_q + 1):
                 current_combination += 1
                 progress = current_combination / total_combinations
                 progress_bar.progress(progress)
-                status_text.text(f"Testing ARIMA({p},{d},{q})... ({current_combination}/{total_combinations})")
+                
+                # Update status
+                status_text.text(f"🔍 Testing ARIMA({p},{d},{q}) - {current_combination}/{total_combinations}")
+                tested_metric.metric("Tested", f"{current_combination}/{total_combinations}")
                 
                 try:
+                    # Fit ARIMA model
                     model = ARIMA(data, order=(p, d, q))
                     fitted = model.fit()
                     aic = fitted.aic
                     bic = fitted.bic
                     
+                    # Calculate additional metrics
+                    residuals = fitted.resid
+                    mse = np.mean(residuals**2)
+                    rmse = np.sqrt(mse)
+                    
+                    successful_fits += 1
+                    successful_metric.metric("Successful", successful_fits)
+                    
                     results.append({
                         'p': p, 'd': d, 'q': q,
-                        'AIC': aic, 'BIC': bic
+                        'AIC': round(aic, 2), 
+                        'BIC': round(bic, 2),
+                        'RMSE': round(rmse, 4),
+                        'LogLikelihood': round(fitted.llf, 2)
                     })
                     
+                    # Update best model based on AIC
                     if aic < best_aic:
                         best_aic = aic
                         best_params = (p, d, q)
                         best_model = fitted
+                        best_aic_metric.metric("Best AIC", f"{aic:.2f}")
                         
-                except Exception:
-                    # Skip invalid parameter combinations
+                except Exception as e:
+                    # Log failed attempts for debugging
                     continue
     
+    # Clean up progress indicators
     progress_bar.empty()
     status_text.empty()
+    
+    # Final summary
+    if successful_fits > 0:
+        st.success(f"✅ Tuning completed! Tested {successful_fits}/{total_combinations} valid combinations")
+    else:
+        st.error("❌ No valid ARIMA models found. Try different parameter ranges.")
     
     return best_model, best_params, results
 
@@ -102,7 +142,7 @@ if step == "Upload":
     st.header("1. Cargar Datos")
     
     # Data source selection
-    data_source = st.radio("Fuente de datos:", ["Archivo CSV", "Yahoo Finance API", "Alpha Vantage API"])
+    data_source = st.radio("Fuente de datos:", ["Archivo CSV", "Yahoo Finance API", "Alpha Vantage API", "Marketstack API"])
     
     if data_source == "Archivo CSV":
         st.subheader("📁 Subir archivo CSV")
@@ -313,6 +353,116 @@ if step == "Upload":
                 except Exception as e:
                     st.error(f"Error descargando desde Alpha Vantage: {e}")
                     st.info("Verifica que el símbolo sea correcto y que tengas acceso a Alpha Vantage")
+    
+    elif data_source == "Marketstack API":
+        st.subheader("🌐 Marketstack API")
+        
+        # Use the provided API key
+        api_key = "9a62121aa780cdf172837957b1fcc708"
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            symbol = st.text_input("Símbolo", value="AAPL", help="Ej: AAPL, GOOGL, MSFT, TSLA")
+        with col2:
+            limit = st.selectbox("Registros", [100, 250, 500, 1000], index=2, 
+                               help="Cantidad de datos históricos")
+        
+        # Exchange selection
+        st.subheader("🏦 Mercados disponibles")
+        exchanges = {
+            "NASDAQ": ["AAPL", "GOOGL", "MSFT", "TSLA", "AMZN"],
+            "NYSE": ["JPM", "BAC", "WMT", "V", "JNJ"],
+            "LSE": ["BP", "SHELL", "VODAFONE", "HSBA"],
+            "TSX": ["SHOP", "CNR", "RY"],
+            "XETRA": ["SAP", "SIE", "ALV"]
+        }
+        
+        selected_exchange = st.selectbox("Mercado:", list(exchanges.keys()))
+        selected_symbol = st.selectbox("O selecciona un símbolo:", [""] + exchanges[selected_exchange])
+        
+        if selected_symbol:
+            symbol = selected_symbol
+        
+        if st.button("Descargar desde Marketstack"):
+            try:
+                with st.spinner(f"Descargando {symbol} desde Marketstack..."):
+                    # Marketstack API endpoint
+                    url = f"http://api.marketstack.com/v1/eod"
+                    params = {
+                        'access_key': api_key,
+                        'symbols': symbol,
+                        'limit': limit,
+                        'sort': 'ASC'  # Ascending order (oldest first)
+                    }
+                    
+                    # Make API request
+                    response = requests.get(url, params=params)
+                    
+                    if response.status_code == 200:
+                        json_data = response.json()
+                        
+                        if 'data' in json_data and json_data['data']:
+                            # Convert to DataFrame
+                            df_data = []
+                            for item in json_data['data']:
+                                df_data.append({
+                                    'date': item['date'][:10],  # Extract date part
+                                    'open': item['open'],
+                                    'high': item['high'],
+                                    'low': item['low'],
+                                    'close': item['close'],
+                                    'volume': item['volume']
+                                })
+                            
+                            data = pd.DataFrame(df_data)
+                            data['date'] = pd.to_datetime(data['date'])
+                            data = data.set_index('date').sort_index()
+                            
+                            st.success(f"Datos de {symbol} descargados desde Marketstack")
+                            
+                            # Show API info
+                            st.info(f"📊 **{symbol}** - Marketstack Professional Data")
+                            
+                            # Show data preview
+                            st.dataframe(data.head())
+                            
+                            # Select target column
+                            available_cols = list(data.columns)
+                            default_col = "close" if "close" in available_cols else available_cols[0]
+                            target_col = st.selectbox("Columna a analizar:", available_cols, 
+                                                    index=available_cols.index(default_col))
+                            
+                            if st.button("Procesar datos Marketstack"):
+                                # Process the data
+                                st.session_state.data = data
+                                st.session_state.target_col = target_col
+                                st.session_state.symbol = symbol
+                                st.session_state.data_source = "Marketstack"
+                                st.success(f"Datos de {symbol} procesados desde Marketstack")
+                                
+                                # Show basic stats
+                                col1, col2, col3 = st.columns(3)
+                                with col1:
+                                    st.metric("Registros", len(data))
+                                with col2:
+                                    start_date = data.index.min().strftime("%Y-%m-%d")
+                                    st.metric("Desde", start_date)
+                                with col3:
+                                    end_date = data.index.max().strftime("%Y-%m-%d")
+                                    st.metric("Hasta", end_date)
+                        else:
+                            st.error(f"No se encontraron datos para {symbol}")
+                            
+                    else:
+                        st.error(f"Error API: {response.status_code}")
+                        if response.status_code == 401:
+                            st.error("Error de autenticación. Verifica la API key.")
+                        elif response.status_code == 422:
+                            st.error("Símbolo no válido o no soportado.")
+                            
+            except Exception as e:
+                st.error(f"Error descargando desde Marketstack: {e}")
+                st.info("Verifica que el símbolo sea correcto (ej: AAPL para Apple)")
 
 # Step 2: Visualize
 elif step == "Visualize":
@@ -422,45 +572,114 @@ elif step == "Model":
                     st.error(f"Error: {e}")
         
         else:  # Automatic
-            st.subheader("Búsqueda automática de parámetros")
+            st.subheader("🔍 Búsqueda automática de parámetros ARIMA")
+            st.info("La optimización automática probará todas las combinaciones para encontrar el mejor modelo")
             
+            # Enhanced parameter controls
             col1, col2, col3 = st.columns(3)
             with col1:
-                max_p = st.number_input("Máximo p", 1, 5, 3)
+                max_p = st.slider("Máximo p (AR)", 1, 8, 5, help="Orden autoregresivo máximo")
             with col2:
-                max_d = st.number_input("Máximo d", 1, 2, 2)
+                max_d = st.slider("Máximo d (I)", 0, 3, 2, help="Grado de diferenciación máximo")
             with col3:
-                max_q = st.number_input("Máximo q", 1, 5, 3)
+                max_q = st.slider("Máximo q (MA)", 1, 8, 5, help="Orden de media móvil máximo")
             
-            if st.button("Búsqueda automática"):
+            # Advanced options
+            with st.expander("⚙️ Opciones avanzadas"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    show_progress = st.checkbox("Mostrar progreso detallado", True)
+                with col2:
+                    max_results = st.number_input("Mostrar top modelos", 3, 20, 10)
+            
+            # Calculate total combinations
+            total_combos = (max_p + 1) * (max_d + 1) * (max_q + 1)
+            st.info(f"🧮 Se probarán **{total_combos}** combinaciones de parámetros")
+            
+            if st.button("🚀 Iniciar búsqueda automática", type="primary"):
                 try:
-                    st.info("Iniciando búsqueda automática de parámetros...")
-                    best_model, best_params, results = auto_arima_tuning(df[target], max_p, max_d, max_q)
+                    st.markdown("---")
+                    st.subheader("📊 Optimización en progreso...")
+                    
+                    # Run enhanced auto tuning
+                    best_model, best_params, results = auto_arima_tuning(
+                        df[target], max_p, max_d, max_q
+                    )
                     
                     if best_model is not None:
                         st.session_state.model = best_model
                         st.session_state.params = best_params
                         
-                        # Show best results
-                        st.success(f"Mejor modelo encontrado: ARIMA{best_params}")
+                        st.markdown("---")
+                        # Enhanced results display
+                        st.success(f"🎯 **Mejor modelo encontrado: ARIMA{best_params}**")
                         
-                        col1, col2 = st.columns(2)
+                        # Model metrics
+                        col1, col2, col3, col4 = st.columns(4)
                         with col1:
                             st.metric("AIC", f"{best_model.aic:.2f}")
                         with col2:
                             st.metric("BIC", f"{best_model.bic:.2f}")
+                        with col3:
+                            st.metric("Log-Likelihood", f"{best_model.llf:.2f}")
+                        with col4:
+                            rmse = np.sqrt(np.mean(best_model.resid**2))
+                            st.metric("RMSE", f"{rmse:.4f}")
                         
-                        # Show top 5 results
+                        # Comprehensive results table
                         if results:
-                            st.subheader("Top 5 mejores modelos")
+                            st.subheader(f"📈 Top {min(max_results, len(results))} mejores modelos")
                             results_df = pd.DataFrame(results)
-                            results_df = results_df.sort_values('AIC').head(5)
-                            st.dataframe(results_df, use_container_width=True)
+                            results_df = results_df.sort_values('AIC').head(max_results)
+                            
+                            # Add ranking
+                            results_df['Ranking'] = range(1, len(results_df) + 1)
+                            results_df = results_df[['Ranking', 'p', 'd', 'q', 'AIC', 'BIC', 'RMSE', 'LogLikelihood']]
+                            
+                            st.dataframe(
+                                results_df, 
+                                use_container_width=True,
+                                hide_index=True
+                            )
+                            
+                            # Model comparison chart
+                            st.subheader("📊 Comparación de modelos")
+                            fig = go.Figure()
+                            
+                            # AIC comparison
+                            fig.add_trace(go.Scatter(
+                                x=list(range(1, len(results_df) + 1)),
+                                y=results_df['AIC'],
+                                mode='lines+markers',
+                                name='AIC',
+                                line=dict(color='blue')
+                            ))
+                            
+                            # BIC comparison
+                            fig.add_trace(go.Scatter(
+                                x=list(range(1, len(results_df) + 1)),
+                                y=results_df['BIC'],
+                                mode='lines+markers',
+                                name='BIC',
+                                line=dict(color='red')
+                            ))
+                            
+                            fig.update_layout(
+                                title="Comparación AIC vs BIC por ranking",
+                                xaxis_title="Ranking del modelo",
+                                yaxis_title="Valor del criterio",
+                                height=400
+                            )
+                            
+                            st.plotly_chart(fig, use_container_width=True)
+                            
                     else:
-                        st.error("No se pudo encontrar un modelo válido")
+                        st.error("❌ No se pudo encontrar un modelo válido")
+                        st.info("Intenta con rangos de parámetros diferentes")
                         
                 except Exception as e:
-                    st.error(f"Error en búsqueda automática: {e}")
+                    st.error(f"❌ Error en búsqueda automática: {e}")
+                    st.info("Verifica que los datos sean válidos para modelado ARIMA")
     else:
         st.warning("Carga los datos primero")
 
