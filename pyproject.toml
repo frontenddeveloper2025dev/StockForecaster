@@ -1,7 +1,7 @@
 [project]
-name = "repl-nix-workspace"
+name = "arima-financial-dashboard"
 version = "0.1.0"
-description = "Add your description here"
+description = "ARIMA Financial AI Dashboard - Advanced forecasting and analysis platform"
 requires-python = ">=3.11"
 dependencies = [
     "alpha-vantage>=3.0.0",

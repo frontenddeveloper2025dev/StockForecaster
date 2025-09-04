@@ -1,6 +1,6 @@
 # Overview
 
-This project is a comprehensive time series forecasting application built with Streamlit for analyzing and predicting stock market trends using ARIMA (AutoRegressive Integrated Moving Average) models. The application provides an interactive interface for users to upload financial data, perform stationarity testing, visualize trends, and generate forecasts through a step-by-step guided workflow.
+ARIMA Financial AI Dashboard is a comprehensive financial time series forecasting application built with Streamlit. The application provides advanced stock market analysis and prediction capabilities using multiple machine learning models including ARIMA, Prophet, and LSTM neural networks. It features a gamified user experience with interactive visualizations, sentiment analysis, and multi-symbol portfolio management designed for both novice and experienced financial analysts.
 
 # User Preferences
 
@@ -9,57 +9,65 @@ Preferred communication style: Simple, everyday language.
 # System Architecture
 
 ## Frontend Architecture
-- **Framework**: Streamlit web application framework for rapid prototyping and data science applications
-- **Layout**: Wide layout configuration optimized for data visualization and charts
-- **Navigation**: Sidebar-based step-by-step workflow with 7 distinct analysis phases
-- **State Management**: Streamlit session state for maintaining data persistence across user interactions
-
-## Application Structure
-- **Single-page Application**: Monolithic app.py structure with conditional rendering based on user navigation
-- **Workflow-driven Design**: Sequential analysis steps from data upload through final predictions
-- **Interactive Components**: File upload, parameter selection, and real-time chart generation
+- **Framework**: Streamlit web application with wide layout optimization for financial data visualization
+- **Navigation**: Sidebar-based workflow with sequential analysis phases from data upload through predictions
+- **State Management**: Streamlit session state for maintaining user data and analysis progress across interactions
+- **Custom Branding**: ARIMA Orange theme with custom logo and favicon integration
+- **Responsive Design**: Multi-column layouts optimized for dashboard-style financial data presentation
 
 ## Data Processing Pipeline
-- **Data Ingestion**: Support for CSV/Excel file uploads through Streamlit file uploader
-- **Time Series Analysis**: Multi-stage pipeline including:
-  - Data exploration and visualization
-  - Stationarity testing using Augmented Dickey-Fuller (ADF) test
-  - Data transformation through differencing to achieve stationarity
-  - Autocorrelation and Partial Autocorrelation Function (ACF/PACF) analysis
-  - ARIMA model parameter optimization and fitting
-  - Forecasting and prediction visualization
+- **Multi-source Data Ingestion**: 
+  - File upload support (CSV/Excel) through Streamlit components
+  - Real-time financial data via Yahoo Finance (yfinance) and Alpha Vantage APIs
+  - Tiingo API integration for enhanced market data coverage
+- **Time Series Processing**: Sequential pipeline including data exploration, stationarity testing (ADF), differencing transformations, and ACF/PACF analysis
+- **Model Training Pipeline**: Automated parameter optimization for ARIMA models with diagnostic testing and validation
 
-## Visualization Strategy
-- **Primary Library**: Plotly for interactive charts with both Graph Objects and Express APIs
-- **Secondary Library**: Matplotlib for statistical plots and compatibility
-- **Chart Types**: Time series plots, correlation plots, residual analysis, and forecast visualizations
-- **Interactivity**: Zoom, pan, hover tooltips, and dynamic updates
+## Machine Learning Architecture
+- **Primary Models**: ARIMA (Auto-Regressive Integrated Moving Average) using statsmodels
+- **Advanced Models**: 
+  - Prophet for trend and seasonality decomposition (optional dependency)
+  - LSTM neural networks via TensorFlow/Keras for deep learning predictions (optional)
+- **Model Selection**: Automated parameter tuning with grid search and information criteria (AIC/BIC)
+- **Validation Framework**: Train/test splits with performance metrics (MSE, MAE) and residual analysis
 
-## Statistical Computing
-- **Core Library**: Statsmodels for time series analysis and ARIMA implementation
-- **Supporting Libraries**: 
-  - NumPy for numerical computations
-  - Pandas for data manipulation and time series handling
-  - SciPy for additional statistical functions
-- **Model Architecture**: ARIMA models with automated parameter selection and diagnostic testing
+## Visualization and Analytics
+- **Primary Visualization**: Plotly Graph Objects and Express for interactive financial charts
+- **Supporting Libraries**: Matplotlib and Seaborn for statistical plots and heatmaps
+- **Chart Types**: Time series plots, correlation matrices, volatility analysis, and forecast confidence intervals
+- **Gamification Elements**: Performance scoring, achievement badges, and progress tracking
+- **Sentiment Integration**: TextBlob-based sentiment analysis with emoji representations
+
+## Error Handling and Fallbacks
+- **Graceful Degradation**: Optional imports with fallback handling for Prophet, TensorFlow, and TextBlob
+- **API Resilience**: Multiple data source options with automatic failover between providers
+- **Validation Pipeline**: Comprehensive data quality checks and user feedback for invalid inputs
 
 # External Dependencies
 
-## Python Libraries
-- **streamlit**: Web application framework and user interface
-- **pandas**: Data manipulation and time series data structures
-- **numpy**: Numerical computing and array operations
-- **matplotlib**: Static plotting and visualization fallback
-- **plotly**: Interactive visualization and charting
-- **statsmodels**: Time series analysis, ARIMA modeling, and statistical tests
-- **scipy**: Statistical functions and probability distributions
+## Core Financial Data APIs
+- **Tiingo API**: Primary market data provider for real-time and historical financial data (required)
+- **Alpha Vantage API**: Secondary financial data source for enhanced coverage (optional)
+- **Yahoo Finance (yfinance)**: Backup data source for broad market access
 
-## Data Sources
-- **File Upload System**: Local file support for CSV and Excel formats
-- **Time Series Data**: Expected format with date/timestamp and numerical value columns
-- **Stock Market Data**: Primary use case for financial time series analysis
+## Machine Learning and Analytics
+- **statsmodels**: Time series analysis, ARIMA modeling, and statistical testing
+- **scikit-learn**: Model evaluation metrics, preprocessing, and validation tools
+- **TensorFlow/Keras**: Deep learning framework for LSTM neural network implementations (optional)
+- **Prophet**: Facebook's time series forecasting library for trend analysis (optional)
+- **NumPy/Pandas**: Numerical computing and data manipulation backbone
+- **SciPy**: Advanced statistical functions and optimization algorithms
 
-## Deployment Requirements
-- **Python Runtime**: Python 3.7+ environment
-- **Memory**: Sufficient RAM for time series data processing and model fitting
-- **Processing**: CPU resources for statistical computations and model training
+## Visualization and UI
+- **Streamlit**: Web application framework and user interface components
+- **Plotly**: Interactive charting and financial visualization library
+- **Matplotlib**: Statistical plotting and chart generation
+- **Seaborn**: Enhanced statistical visualization and heatmap generation
+
+## Natural Language Processing
+- **TextBlob**: Sentiment analysis for market sentiment integration (optional)
+
+## Deployment Infrastructure
+- **Render Platform**: Cloud deployment with automated build and start scripts
+- **Environment Configuration**: Custom Streamlit server settings for production deployment
+- **Build Pipeline**: Bash scripts for dependency installation and application startup
