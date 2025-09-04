@@ -1,77 +1,68 @@
-# Overview
+# ARIMA Financial AI Dashboard
 
-ARIMA Financial AI Dashboard is a comprehensive financial time series analysis and forecasting application built with Streamlit. The dashboard provides advanced machine learning capabilities for stock market analysis, including ARIMA modeling, Prophet forecasting, LSTM neural networks, and sentiment analysis. It features a gamified user experience with portfolio management, interactive visualizations, and multi-symbol analysis capabilities.
+## Overview
 
-# User Preferences
+This is a financial analytics dashboard built with Streamlit that provides ARIMA-based time series forecasting and analysis for financial data. The application focuses on stock market analysis using various statistical and machine learning models, with support for advanced forecasting techniques including Prophet and LSTM neural networks when available.
+
+## User Preferences
 
 Preferred communication style: Simple, everyday language.
 
-# System Architecture
+## System Architecture
 
-## Frontend Architecture
-- **Framework**: Streamlit web application framework providing rapid development and deployment for data science applications
-- **Layout**: Wide layout configuration optimized for financial data visualization and interactive charts
-- **Navigation**: Sidebar-based sequential workflow with 7 distinct analysis phases from data ingestion to prediction
-- **State Management**: Streamlit session state for maintaining user data and analysis results across interactions
-- **Theming**: Custom ARIMA Orange branding with personalized logo and color scheme
+### Frontend Architecture
+- **Framework**: Streamlit web application framework for rapid data app development
+- **UI Components**: Wide layout with expandable sidebar for enhanced user experience
+- **Visualization**: Plotly for interactive charts and graphs, with Seaborn integration for statistical plots
+- **Styling**: Custom favicon support with responsive design
 
-## Application Structure
-- **Monolithic Design**: Single app.py file containing all application logic with conditional rendering based on user navigation
-- **Workflow-driven Interface**: Step-by-step analysis pipeline guiding users through complete financial analysis process
-- **Interactive Components**: File upload capabilities, parameter selection widgets, real-time chart generation, and gamification elements
-- **Multi-model Support**: Graceful fallbacks when advanced ML libraries (TensorFlow, Prophet) are unavailable
+### Data Processing & Analytics Engine
+- **Core Analytics**: NumPy and Pandas for data manipulation and statistical computations
+- **Time Series Analysis**: 
+  - Primary: ARIMA models using statsmodels for forecasting
+  - Advanced: Prophet for trend decomposition and seasonality analysis (optional)
+  - ML-based: LSTM neural networks via TensorFlow/Keras for deep learning forecasting (optional)
+- **Model Evaluation**: Scikit-learn metrics for performance assessment (MSE, MAE)
+- **Statistical Testing**: Augmented Dickey-Fuller test for stationarity analysis
 
-## Data Processing Pipeline
-- **Multi-source Data Ingestion**: Support for 7 different financial data sources including Yahoo Finance and Tiingo API
-- **Time Series Analysis Pipeline**:
-  - Data exploration and statistical visualization
-  - Stationarity testing using Augmented Dickey-Fuller (ADF) test
-  - Data transformation through differencing to achieve stationarity
-  - Autocorrelation and Partial Autocorrelation Function (ACF/PACF) analysis
-  - ARIMA model parameter optimization with automated selection
-  - Advanced forecasting with Prophet and LSTM models (when available)
-  - Model performance evaluation and comparison
+### Data Sources & Integration
+- **Primary Data Provider**: Yahoo Finance via yfinance library for real-time and historical stock data
+- **Secondary Source**: Alpha Vantage API for additional financial data and validation
+- **Data Preprocessing**: MinMaxScaler for neural network input normalization
 
-## Visualization and Analytics
-- **Primary Visualization**: Plotly for interactive financial charts with both Graph Objects and Express APIs
-- **Chart Types**: Time series plots, correlation matrices, heat maps, residual analysis, and multi-model forecast comparisons
-- **Advanced Features**: Portfolio analysis, sentiment analysis with emoji indicators, achievement tracking system
-- **Performance Metrics**: Comprehensive model evaluation using MSE, MAE, and statistical diagnostics
+### Optional Features (Graceful Degradation)
+- **Sentiment Analysis**: TextBlob integration for market sentiment evaluation when available
+- **Advanced ML Models**: Prophet and TensorFlow models with fallback handling
+- **Error Handling**: Comprehensive warning suppression and graceful feature degradation
 
-## Deployment Architecture
-- **Platform**: Optimized for Render cloud deployment with containerized approach
-- **Build System**: Multi-stage build process with dependency optimization for cloud environments
-- **Environment Management**: Flexible configuration supporting both full-featured and lightweight deployments
-- **Error Handling**: Robust fallback mechanisms for missing dependencies and API failures
+### Application Configuration
+- **Deployment**: Configured for wide-screen dashboard experience
+- **Error Management**: Warnings filtered to provide clean user experience
+- **Performance**: Optimized imports with conditional loading for heavy dependencies
 
-# External Dependencies
+## External Dependencies
 
-## Core Python Libraries
-- **streamlit**: Web application framework and user interface rendering
-- **pandas**: Financial data manipulation and time series data structures
-- **numpy**: Numerical computations and array operations
-- **plotly**: Interactive financial visualizations and charting
-- **statsmodels**: ARIMA modeling and statistical time series analysis
+### Core Financial Data APIs
+- **Yahoo Finance (yfinance)**: Primary data source for stock prices, trading volumes, and market data
+- **Alpha Vantage API**: Secondary financial data provider requiring API key configuration
 
-## Advanced Machine Learning (Optional)
-- **tensorflow**: LSTM neural network implementation for deep learning forecasting
-- **prophet**: Facebook's time series forecasting library for trend analysis
-- **scikit-learn**: Machine learning utilities and model evaluation metrics
-- **textblob**: Natural language processing for sentiment analysis
+### Machine Learning & Analytics Libraries
+- **Statsmodels**: Statistical analysis and ARIMA modeling capabilities
+- **Scikit-learn**: Model evaluation metrics and data preprocessing utilities
+- **TensorFlow/Keras**: Optional deep learning framework for LSTM time series forecasting
+- **Prophet**: Optional Facebook's time series forecasting tool for trend analysis
 
-## Financial Data APIs
-- **yfinance**: Yahoo Finance API for stock market data retrieval
-- **alpha-vantage**: Alpha Vantage API for additional financial data sources
-- **tiingo**: Professional financial data API (primary data source)
+### Visualization & UI Framework
+- **Streamlit**: Web application framework and deployment platform
+- **Plotly**: Interactive charting and visualization library
+- **Matplotlib/Seaborn**: Statistical plotting and data visualization support
 
-## Supporting Libraries
-- **matplotlib**: Statistical plotting and chart generation
-- **seaborn**: Statistical data visualization and correlation analysis
-- **requests**: HTTP client for API communications
-- **scipy**: Scientific computing and statistical functions
-- **websockets**: Real-time data streaming capabilities
+### Data Processing Stack
+- **Pandas**: Data manipulation and analysis framework
+- **NumPy**: Numerical computing foundation
+- **SciPy**: Scientific computing utilities for statistical operations
 
-## Deployment Dependencies
-- **Cloud Platform**: Render web service for application hosting
-- **Environment Variables**: API key management for financial data services
-- **Build Tools**: Bash scripts for optimized cloud deployment and dependency management
+### Utility Dependencies
+- **Requests**: HTTP client for API communications
+- **WebSockets**: Real-time data streaming capabilities
+- **TextBlob**: Optional natural language processing for sentiment analysis
