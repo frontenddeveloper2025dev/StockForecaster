@@ -3,14 +3,12 @@ services:
     name: arima-financial-dashboard
     env: python
     plan: free
-    buildCommand: "./render-build.sh"
-    startCommand: "./render-start.sh"
+    buildCommand: bash render-build.sh
+    startCommand: bash render-start.sh
     envVars:
       - key: PYTHONUNBUFFERED
-        value: 1
+        value: "1"
       - key: STREAMLIT_SERVER_HEADLESS
-        value: true
-      - key: STREAMLIT_SERVER_PORT
-        value: 10000
+        value: "true"
       - key: STREAMLIT_SERVER_ADDRESS
-        value: 0.0.0.0
+        value: "0.0.0.0"
